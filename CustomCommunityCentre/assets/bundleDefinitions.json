@@ -1,0 +1,44 @@
+﻿[
+    {
+        "AreaName": "Kitchen",
+        "Keys": null,
+        "BundleSets": [
+            {
+                "Bundles": [
+                    {
+                        "Name": "Baker's",
+                        "Index": 0,
+                        "Sprite": "Mods/blueberry.CommunityCentreKitchen.Assets/BundleSprites:0",
+                        "Color": "Purple",
+                        "Items": "1 Rhubarb Pie, 1 Strange Bun, 1 Fruit Salad, 1 Chocolate Cake, 1 Maple Bar",
+                        "Pick": -1,
+                        "RequiredItems": 5,
+                        "Reward": "2 Cookout Kit"
+                    },
+                    {
+                        "Name": "Diner's",
+                        "Index": 1,
+                        "Sprite": "Mods/blueberry.CommunityCentreKitchen.Assets/BundleSprites:1",
+                        "Color": "Yellow",
+                        "Items": "1 Glazed Yams, 1 SQ Survival Burger, 1 GQ Blueberry Tart, 1 Pepper Poppers",
+                        "Pick": -1,
+                        "RequiredItems": 4,
+                        "Reward": "1 Oil Maker"
+                    },
+                    {
+                        "Name": "Picnicker's",
+                        "Index": 2,
+                        "Sprite": "Mods/blueberry.CommunityCentreKitchen.Assets/BundleSprites:2",
+                        "Color": "Teal",
+                        "Items": "1 Hashbrowns, 1 Cheese Cauliflower, 1 Cookie, 1 Farmer's Lunch",
+                        "Pick": -1,
+                        "RequiredItems": 4,
+                        "Reward": "5 Sugar"
+                    }
+                ]
+            }
+        ],
+        "Bundles": [
+        ]
+    }
+]
