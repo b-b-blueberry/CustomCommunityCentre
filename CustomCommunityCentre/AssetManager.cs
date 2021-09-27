@@ -7,19 +7,28 @@ using StardewValley.GameData;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace CustomCommunityCentre
 {
-	public partial class AssetManager : IAssetLoader, IAssetEditor
+	// TODO: Prefix all area and bundle names with the mod manifest unique ID
+
+	public class AssetManager : IAssetLoader, IAssetEditor
 	{
 		private ITranslationHelper i18n => ModEntry.Instance.Helper.Translation;
 
 		// Assets
 		public static string AssetPrefix => ModEntry.Instance.ModManifest.UniqueID;
+		public static readonly char[] ForbiddenAssetNameCharacters = new char[]
+		{
+			System.IO.Path.DirectorySeparatorChar,
+			Bundles.ModDataKeyDelim,
+			Bundles.ModDataValueDelim
+		};
 
 		// Game content assets
 		public static readonly string RootGameContentPath = PathUtilities.NormalizeAssetName(
-			$@"Mods/{ModEntry.Instance.ModManifest.Author}.{ModEntry.Instance.ModManifest.UniqueID}.Assets");
+			$@"Mods/{ModEntry.Instance.ModManifest.UniqueID}.Assets");
 		public static string GameBundleDefinitionsPath { get; private set; } = "BundleDefinitions";
 		public static string GameBundleSubstitutesPath { get; private set; } = "BundleSubstitutes";
 		public static string GameBundleMetadataPath { get; private set; } = "BundleMetadata";
@@ -36,7 +45,7 @@ namespace CustomCommunityCentre
 		private readonly List<string> _assetsToLoad = new List<string>();
 		private readonly List<string> _assetsToEdit = new List<string>
 		{
-			@"LooseSprites/JunimoNote",
+			@"Data/Events/Town",
 			@"Maps/townInterior",
 			@"Strings/BundleNames",
 			@"Strings/Locations",
@@ -129,40 +138,90 @@ namespace CustomCommunityCentre
 				var bundleSubstitutes = Game1.content.Load
 					<Dictionary<string, List<SubstituteBundleData>>>
 					(AssetManager.GameBundleSubstitutesPath);
+				var randomBundleData = Game1.content.Load
+					<List<RandomBundleData>>
+					(@"Data/RandomBundles");
+				var defaultBundleData = Game1.content.LoadBase
+					<Dictionary<string, string>>
+					(@"Data/Bundles");
 
-				// Set up the custom area bundle dictionary
-				Bundles.CustomAreaNameAndNumberDictionary = new Dictionary<string, int>();
-				Bundles.CustomAreaBundleDictionary = new Dictionary<string, string[]>();
+				StringBuilder errorMessage = new StringBuilder();
 
-				// Populate "Keys" fields dynamically
-				for (int i = 0; i < data.Count; ++i)
+				// Reset custom area-bundle dictionaries
+				Bundles.CustomAreaNamesAndNumbers.Clear();
+				Bundles.CustomAreaBundleKeys.Clear();
+				Bundles.CustomAreasComplete.Clear();
+
+				int areaSum = Bundles.CustomAreaInitialIndex;
+				int bundleSum = Bundles.CustomBundleInitialIndex;
+
+				for (int i = data.Count - 1; i >= 0; --i)
 				{
 					RandomBundleData area = data[i];
+
+					// Validate areas
+					if (area.AreaName == null)
+					{
+						errorMessage.AppendLine($"Custom area {i + 1} was not loaded: {nameof(BundleMetadata.AreaName)} was null.");
+						data.RemoveAt(i);
+						continue;
+					}
+					IEnumerable<char> badChars = area.AreaName
+						.Where(c => AssetManager.ForbiddenAssetNameCharacters.Contains(c))
+						.Distinct();
+					if (badChars.Any())
+					{
+						errorMessage.AppendLine($"Custom area '{area.AreaName}' was not loaded: Area {nameof(BundleMetadata.AreaName)} contains forbidden characters '{string.Join(", ", badChars)}'");
+						data.RemoveAt(i);
+						continue;
+					}
+
+					// Validate bundles
 					List<BundleData> bundles = area.BundleSets
-						// Default bundles
-						.SelectMany(bsd => bsd.Bundles)
-						// Random bundles
-						.Concat(area.Bundles)
-						.ToList();
-					List<int> indexes = bundles
-						.Select(bd => bd.Index)
-						.Distinct()
-						.ToList();
-					area.Keys = string.Join(" ", indexes);
+					   // Default bundles
+					   .SelectMany(bsd => bsd.Bundles)
+					   // Random bundles
+					   .Concat(area.Bundles)
+					   .ToList();
+					if (bundles.Any(bundle => bundle?.Name == null))
+					{
+						errorMessage.AppendLine($"Custom area {i + 1} was not loaded: Bundle or {nameof(BundleData.Name)} was null.");
+						data.RemoveAt(i);
+						continue;
+					}
+					badChars = bundles
+						.SelectMany(b => b.Name.Where(c => AssetManager.ForbiddenAssetNameCharacters.Contains(c)))
+						.Distinct();
+					if (badChars.Any())
+					{
+						IEnumerable<string> badNames = bundles
+							.Where(b => b.Name.Any(c => AssetManager.ForbiddenAssetNameCharacters.Contains(c)))
+							.Select(b => b.Name);
+						errorMessage.AppendLine($"Custom area '{area.AreaName}' was not loaded: Bundle '{string.Join(",", badNames)}' contains forbidden characters '{string.Join(", ", badChars)}'");
+						data.RemoveAt(i);
+						continue;
+					}
 
-					// Add area and bundles to the custom area-bundle dictionaries
-					Bundles.CustomAreaNameAndNumberDictionary.Add(
-						key: area.AreaName,
-						value: i);
-					Bundles.CustomAreaBundleDictionary.Add(
-						key: area.AreaName,
-						value: bundles
-							.Select(bd => $"{bd.Name}/{bd.Index}")
-							.ToArray());
+					// Set unique area-bundle index keys
+					Dictionary<string, int> bundleNamesAndNumbers = bundles.ToDictionary(
+						keySelector: bundle => bundle.Name,
+						elementSelector: bundle => bundleSum + bundle.Index);
 
-					// At this stage the bundle indexes aren't respective of the base game bundles,
-					// nor necessarily of one another.
-					// We'll iron this out in the Bundles.Parse method.
+					string[] bundleKeys = bundleNamesAndNumbers
+						.Select(pair => $"{pair.Key}{Bundles.BundleKeyDelim}{pair.Value}")
+						.ToArray();
+
+					int[] bundleNumbers = bundleNamesAndNumbers.Values.Distinct().ToArray();
+
+					area.Keys = string.Join(" ", bundleNumbers);
+
+					// Set custom area-bundle dictionary values
+					Bundles.CustomAreaBundleKeys[area.AreaName] = bundleKeys;
+					Bundles.CustomAreasComplete[areaSum] = false;
+					Bundles.CustomAreaNamesAndNumbers[area.AreaName] = areaSum;
+
+					bundleSum += bundleNumbers.Length;
+					areaSum++;
 				}
 
 				// Replace bundle entries with substitute values
@@ -178,8 +237,25 @@ namespace CustomCommunityCentre
 					Log.D($"Loading substitute bundles from {uniqueId}...",
 						ModEntry.Config.DebugMode);
 
-					foreach (SubstituteBundleData bundleSubstitute in bundleSubstitutes[uniqueId])
+					for (int i = bundleSubstitutes[uniqueId].Count - 1; i >= 0; --i)
 					{
+						SubstituteBundleData bundleSubstitute = bundleSubstitutes[uniqueId][i];
+
+						// Validate bundle substitutes
+						if (bundleSubstitute.BundleName == null)
+						{
+							errorMessage.AppendLine($"Bundle substitute for '{uniqueId}' was not loaded: {nameof(SubstituteBundleData.BundleName)} was null.");
+							bundleSubstitutes[uniqueId].RemoveAt(i);
+							continue;
+						}
+						IEnumerable<char> badChars = bundleSubstitute.BundleName.Where(c => AssetManager.ForbiddenAssetNameCharacters.Contains(c)).Distinct();
+						if (badChars.Any())
+						{
+							errorMessage.AppendLine($"Bundle substitute '{bundleSubstitute.BundleName}' was not loaded: {nameof(SubstituteBundleData.BundleName)} contains forbidden characters '{string.Join(", ", badChars)}'");
+							bundleSubstitutes[uniqueId].RemoveAt(i);
+							continue;
+						}
+
 						// Find matching bundle for substitute bundle
 						IEnumerable<BundleData> bundles = data
 							// Default bundles
@@ -187,16 +263,16 @@ namespace CustomCommunityCentre
 							// Random bundles
 							.Concat(data.SelectMany(rbd => rbd.Bundles));
 						BundleData bundle = bundles
-							.FirstOrDefault(bd => bd.Name == bundleSubstitute.Name);
+							.FirstOrDefault(bd => bd.Name == bundleSubstitute.BundleName);
 
 						if (bundle == null)
 						{
-							Log.D($"Skipping substitute bundle {bundleSubstitute.Name}: Match not found.",
+							Log.D($"Skipping substitute bundle {bundleSubstitute.BundleName}: Match not found.",
 								ModEntry.Config.DebugMode);
 							continue;
 						}
 
-						Log.D($"Substituting bundle: {bundleSubstitute.Name}...",
+						Log.D($"Substituting bundle: {bundleSubstitute.BundleName}...",
 							ModEntry.Config.DebugMode);
 
 						// Substitute entries in bundle with provided values
@@ -211,35 +287,49 @@ namespace CustomCommunityCentre
 					}
 				}
 
+				if (errorMessage.Length > 0)
+				{
+					Log.E(errorMessage.ToString());
+				}
+
+				// Append custom bundle data to default random bundle data after modifications
+				data = randomBundleData.Union(data).ToList();
+
 				asset.ReplaceWith(data);
 				return;
 			}
 
 			if (asset.AssetNameEquals(AssetManager.GameBundleSubstitutesPath))
 			{
-				var data = asset.AsDictionary<string, List<SubstituteBundleData>>();
+				var data = asset.AsDictionary<string, List<SubstituteBundleData>>().Data;
 
 				// . . .
 
 				return;
 			}
 
-			if (asset.AssetNameEquals(@"LooseSprites/JunimoNote"))
+			if (asset.AssetNameEquals(@"Data/Events/Town"))
 			{
-				var destImage = asset.AsImage();
+				var data = asset.AsDictionary<string, string>().Data;
 
-				Rectangle sourceArea = new Rectangle(0, 0, 32 * 3, 32);
-				Rectangle targetArea = new Rectangle(544, 212, 32 * 3, 32);
-				Texture2D source = Game1.content.Load
-					<Texture2D>
-					(AssetManager.GameBundleSpritesPath);
-				destImage.PatchImage(
-					source: source,
-					sourceArea: sourceArea,
-					targetArea: targetArea,
-					patchMode: PatchMode.Replace);
+				// Append completed mail received for all custom areas as required flags for CC completion event
 
-				asset.ReplaceWith(destImage.Data);
+				const char delimiter = '/';
+				const string mailFlag = "Hn";
+
+				string eventId = ((int)Bundles.EventIds.CommunityCentreComplete).ToString();
+				string eventKey = data.Keys.FirstOrDefault(key => key.Split(delimiter).First() == eventId);
+				string eventScript = data[eventKey];
+				string[] mailFlags = new List<string> { eventKey }
+					.Concat(Bundles.CustomAreaNamesAndNumbers.Keys
+						.Select(areaName => $"{mailFlag} {string.Format(Bundles.MailAreaCompleted, Bundles.GetAreaNameAsAssetKey(areaName))}"))
+					.ToArray();
+
+				data.Remove(eventKey);
+				eventKey = string.Join(delimiter.ToString(), mailFlags);
+				data[eventKey] = eventScript;
+
+				asset.ReplaceWith(data);
 				return;
 			}
 
@@ -283,7 +373,7 @@ namespace CustomCommunityCentre
 			{
 				var data = asset.AsDictionary<string, string>().Data;
 
-				foreach (BundleMetadata bundleMetadata in Bundles.BundleMetadata)
+				foreach (BundleMetadata bundleMetadata in Bundles.CustomBundleMetadata)
 				{
 					foreach (string bundleName in bundleMetadata.BundleDisplayNames.Keys)
 					{
@@ -301,23 +391,17 @@ namespace CustomCommunityCentre
 			{
 				var data = asset.AsDictionary<string, string>().Data;
 
-				// Add area names
-				foreach (BundleMetadata bundleMetadata in Bundles.BundleMetadata)
+				// Add area display names and completion strings
+				foreach (BundleMetadata bundleMetadata in Bundles.CustomBundleMetadata)
 				{
-					data[$"CommunityCenter_AreaName_{bundleMetadata.AreaName}"] = bundleMetadata.AreaDisplayNames
+					string areaNameAsAssetKey = Bundles.GetAreaNameAsAssetKey(bundleMetadata.AreaName);
+					data[$"CommunityCenter_AreaName_{areaNameAsAssetKey}"] = bundleMetadata.AreaDisplayName
 						.TryGetValue(LocalizedContentManager.CurrentLanguageCode.ToString(), out string str)
 						? str
 						: bundleMetadata.AreaName;
 
-					// Insert a new AreaCompletion line to account for our extra area
-					const int newJunimoLineNumber = 3;
-					for (int i = Bundles.CustomAreaNameAndNumberDictionary[bundleMetadata.AreaName] + 1; i > newJunimoLineNumber; --i)
-					{
-						string below = data[$"CommunityCenter_AreaCompletion{i - 1}"];
-						data[$"CommunityCenter_AreaCompletion{i}"] = below;
-					}
-					str = BundleMetadata.GetLocalisedString(dict: bundleMetadata.AreaCompletionMessage, defaultValue: string.Empty);
-					data[$"CommunityCenter_AreaCompletion{newJunimoLineNumber}"] = str;
+					str = BundleMetadata.GetLocalisedString(dict: bundleMetadata.AreaCompleteDialogue, defaultValue: string.Empty);
+					data[$"CommunityCenter_AreaCompletion_{areaNameAsAssetKey}"] = str;
 				}
 
 				asset.ReplaceWith(data);
@@ -329,9 +413,10 @@ namespace CustomCommunityCentre
 				var data = asset.AsDictionary<string, string>().Data;
 
 				// Add reward text
-				foreach (BundleMetadata bundleMetadata in Bundles.BundleMetadata)
+				foreach (BundleMetadata bundleMetadata in Bundles.CustomBundleMetadata)
 				{
-					data[$"JunimoNote_Reward{bundleMetadata.AreaName}"] = bundleMetadata.AreaCompletionMessage
+					int areaNumber = Bundles.GetCustomAreaNumberFromName(bundleMetadata.AreaName);
+					data[$"JunimoNote_Reward{areaNumber}"] = bundleMetadata.AreaCompleteDialogue
 						.TryGetValue(LocalizedContentManager.CurrentLanguageCode.ToString(), out string str)
 						? str
 						: string.Empty;
@@ -346,7 +431,7 @@ namespace CustomCommunityCentre
 		{
 			helper.Content.InvalidateCache(@"Strings/UI");
 
-			Bundles.BundleMetadata = Game1.content.Load
+			Bundles.CustomBundleMetadata = Game1.content.Load
 				<List<BundleMetadata>>
 				(AssetManager.GameBundleMetadataPath);
 		}

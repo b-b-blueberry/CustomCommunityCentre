@@ -65,7 +65,8 @@ namespace CustomCommunityCentre
 		private static void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
 		{
 			// In-game interactions
-			if (!Game1.game1.IsActive || Game1.currentLocation == null || !Context.IsWorldReady)
+			if (!Game1.game1.IsActive || Game1.currentLocation == null || !Context.IsWorldReady
+				|| !(Game1.currentLocation is CommunityCenter cc) || !Kitchen.IsKitchenComplete(cc))
 				return;
 
 			// . . .
@@ -79,25 +80,49 @@ namespace CustomCommunityCentre
 				// Tile actions
 				Tile tile = Game1.currentLocation.Map.GetLayer("Buildings")
 					.Tiles[(int)e.Cursor.GrabTile.X, (int)e.Cursor.GrabTile.Y];
+				if (tile == null)
+					return;
 
-				// Open Community Centre fridge door
-				if (Game1.currentLocation is CommunityCenter cc && Kitchen.IsKitchenComplete(cc)
-					&& tile != null && tile.TileIndex == Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1])
+				// Use Community Centre kitchen as a cooking station
+				if (Kitchen.CookingTileIndexes[Kitchen.FridgeTilesToUse].Contains(tile.TileIndex))
 				{
-					// Change tile to use custom open-fridge sprite
-					Point tileLocation = Utility.Vector2ToPoint(Kitchen.FridgeTilePosition);
-					Game1.currentLocation.Map.GetLayer("Front")
-						.Tiles[tileLocation.X, tileLocation.Y - 1]
-						.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][2];
-					Game1.currentLocation.Map.GetLayer("Buildings")
-						.Tiles[tileLocation.X, tileLocation.Y]
-						.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][3];
-
-					// Open the fridge as a chest
-					((Chest)cc.Objects[Kitchen.FridgeChestPosition]).fridge.Value = true;
-					((Chest)cc.Objects[Kitchen.FridgeChestPosition]).checkForAction(Game1.player);
+					Netcode.NetRef<Chest> netChest = new Netcode.NetRef<Chest>
+					{
+						Value = (Chest)cc.Objects[Kitchen.FridgeChestPosition]
+					};
+					cc.ActivateKitchen(fridge: netChest);
 
 					Helper.Input.Suppress(e.Button);
+					return;
+				}
+
+				// Open Community Centre fridge door
+				if (tile.TileIndex == Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1])
+				{
+					// Open the fridge as a chest
+					Point tileLocation = Utility.Vector2ToPoint(Kitchen.FridgeTilePosition);
+					if (((Chest)cc.Objects[Kitchen.FridgeChestPosition]).checkForAction(Game1.player))
+					{
+						// Change tile to use custom open-fridge sprite
+						Game1.currentLocation.Map.GetLayer("Front")
+							.Tiles[tileLocation.X, tileLocation.Y - 1]
+							.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][2];
+						Game1.currentLocation.Map.GetLayer("Buildings")
+							.Tiles[tileLocation.X, tileLocation.Y]
+							.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][3];
+					}
+					else
+					{
+						cc.Map.GetLayer("Front")
+							.Tiles[tileLocation.X, tileLocation.Y - 1]
+							.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][0];
+						cc.Map.GetLayer("Buildings")
+							.Tiles[tileLocation.X, tileLocation.Y]
+							.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1];
+					}
+
+					Helper.Input.Suppress(e.Button);
+					return;
 				}
 			}
 		}
@@ -141,8 +166,10 @@ namespace CustomCommunityCentre
 			// Add community centre kitchen fridge container to the map for later
 			if (!cc.Objects.ContainsKey(Kitchen.FridgeChestPosition))
 			{
-				cc.Objects.Add(Kitchen.FridgeChestPosition, new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition));
+				Chest chest = new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
+				cc.Objects.Add(Kitchen.FridgeChestPosition, chest);
 			}
+			((Chest)cc.Objects[Kitchen.FridgeChestPosition]).fridge.Value = true;
 		}
 
 		public static bool IsKitchenLoaded(CommunityCenter cc)
@@ -150,10 +177,8 @@ namespace CustomCommunityCentre
 			if (cc == null)
 				return false;
 
-			bool bundlesExist = Game1.netWorldState.Value.Bundles.Keys.Any(key => key > Bundles.CustomBundleInitialIndex);
-			bool areasCompleteEntriesExist = cc.areasComplete.Count >= Bundles.DefaultMaxArea;
-			bool clientEnabled = !Game1.IsMasterGame && (bundlesExist || areasCompleteEntriesExist);
-			return clientEnabled;
+			bool bundlesExist = Game1.netWorldState.Value.BundleData.Keys.Any(key => key.Split(Bundles.BundleKeyDelim).First() == Kitchen.KitchenAreaName);
+			return bundlesExist;
 		}
 
 		public static bool IsKitchenComplete(CommunityCenter cc)
@@ -161,11 +186,11 @@ namespace CustomCommunityCentre
 			if (cc == null)
 				return false;
 
-			int kitchenNumber = Bundles.GetAreaNumberFromName(Kitchen.KitchenAreaName);
+			int kitchenNumber = Bundles.GetCustomAreaNumberFromName(Kitchen.KitchenAreaName);
 
 			bool receivedMail = HasOrWillReceiveKitchenCompletedMail();
-			bool noCustomAreas = kitchenNumber < 0 || cc.areasComplete.Count <= kitchenNumber;
-			bool customAreasComplete = noCustomAreas || cc.areasComplete[kitchenNumber];
+			bool noCustomAreas = kitchenNumber < 0 || Bundles.AreAnyCustomAreasLoaded();
+			bool customAreasComplete = noCustomAreas || Bundles.IsCustomAreaComplete(kitchenNumber);
 			bool ccIsComplete = Bundles.IsCommunityCentreComplete(cc);
 			Log.T($"IsCommunityCentreKitchenComplete: (mail: {receivedMail}) || (entries: {noCustomAreas}) || (areas: {customAreasComplete}) || (cc: {ccIsComplete})");
 			return receivedMail || noCustomAreas || customAreasComplete || ccIsComplete;

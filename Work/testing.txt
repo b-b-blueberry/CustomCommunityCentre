@@ -1,17 +1,17 @@
-✔️	Load custom data
-	✔️	Add CC values
-	✔️	Add NetWorldState values
-	✔️	Add multiplayer values
-	✔️		Join as peer
+✔	Load custom data
+	✔	Add CC values
+	✔	Add NetWorldState values
+	✔	Add multiplayer values
+	✔		Join as peer
 
-✔️	Unload custom data
-	✔️	Clear CC values
-	✔️	Clear NetWorldState values
-	✔️	Clear multiplayer values
+✔	Unload custom data
+	✔	Clear CC values
+	✔	Clear NetWorldState values
+	✔	Clear multiplayer values
 
-	Donate item
-		Persistent bundle progress
-			Overnight
+✔	Donate item
+	✔	Persistent bundle progress
+	✔		Overnight
 			Unload bundle
 			Reinstall
 		Preserved donated items
@@ -51,7 +51,7 @@
 
 	Complete JMWH
 
-✔️	Load 1 custom area
+	Load 1 custom area
 
 	Load 2 custom areas
 
@@ -61,15 +61,15 @@
 
 	Complete AJM
 
-	Junimo Note Menu
-	✔️	Open
-	✔️	Mutex
-		Navigate
+✔	Junimo Note Menu
+	✔	Open
+	✔	Mutex
+	✔	Navigate
 			Host
-	✔️			1 area
-	✔️			2 areas
+			✔	1 area
+			✔	2 areas
 				4 areas
 			Peer
-	✔️			1 area
-	✔️			2 areas
+			✔	1 area
+			✔	2 areas
 				4 areas

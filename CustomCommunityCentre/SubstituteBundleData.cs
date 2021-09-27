@@ -2,7 +2,7 @@
 {
 	public class SubstituteBundleData
 	{
-		public string Name;
+		public string BundleName;
 		public string Items = null;
 		public int? Pick = null;
 		public int? RequiredItems = null;

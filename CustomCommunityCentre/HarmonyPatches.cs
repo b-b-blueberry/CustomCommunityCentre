@@ -37,6 +37,7 @@ namespace CustomCommunityCentre
 		private static IReflectionHelper Reflection => ModEntry.Instance.Helper.Reflection;
 
 		private const string ConstructorName = ".ctor";
+		private const char PatchDelimiter = '_';
 
 		private static readonly Patch[] Patches = new Patch[]
 		{
@@ -74,10 +75,6 @@ namespace CustomCommunityCentre
 				targetMethod: "cleanupBeforeSave",
 				patchMethod: nameof(HarmonyPatches.CleanupBeforeSave_Prefix)),
 			new Patch(
-				targetType: typeof(GameLocation),
-				targetMethod: "setUpLocationSpecificFlair",
-				patchMethod: nameof(HarmonyPatches.SetUpLocationSpecificFlair_Postfix)),
-			new Patch(
 				targetType: typeof(CommunityCenter),
 				targetMethod: "resetSharedState",
 				patchMethod: nameof(HarmonyPatches.ResetSharedState_Postfix)),
@@ -91,14 +88,13 @@ namespace CustomCommunityCentre
 				targetType: typeof(CommunityCenter),
 				targetMethod: "getAreaBounds",
 				patchMethod: nameof(HarmonyPatches.GetAreaBounds_Postfix)),
-			/*
-			// FatalExecutionEngineError: Uncomment for SDV 1.5.5
+			#if NET5_0
+			// FatalExecutionEngineError with .NET Framework <5.0
 			new Patch(
 				targetType: typeof(CommunityCenter),
 				targetMethod: "getNotePosition",
 				patchMethod: nameof(HarmonyPatches.GetNotePosition_Prefix)),
-			*/
-
+			#endif
 			// Area name and number methods:
 			new Patch(
 				targetType: typeof(CommunityCenter),
@@ -120,6 +116,10 @@ namespace CustomCommunityCentre
 				targetType: typeof(CommunityCenter),
 				targetMethod: "getAreaDisplayNameFromNumber",
 				patchMethod: nameof(HarmonyPatches.AreaDisplayNameFromNumber_Postfix)),
+			new Patch(
+				targetType: typeof(JunimoNoteMenu),
+				targetMethod: "getRewardNameForArea",
+				patchMethod: nameof(HarmonyPatches.GetRewardNameForArea_Postfix)),
 
 			// Area progress methods:
 			new Patch(
@@ -139,7 +139,33 @@ namespace CustomCommunityCentre
 				targetMethod: "initAreaBundleConversions",
 				patchMethod: nameof(HarmonyPatches.InitAreaBundleConversions_Prefix)),
 
+			// oh my god
+			new Patch(
+				targetType: typeof(CommunityCenter),
+				targetMethod: "markAreaAsComplete",
+				patchMethod: nameof(HarmonyPatches.MarkAreaAsComplete_Prefix)),
+			new Patch(
+				targetType: typeof(CommunityCenter),
+				targetMethod: "getNumberOfAreasComplete",
+				patchMethod: nameof(HarmonyPatches.GetNumberOfAreasComplete_Postfix)),
+			new Patch(
+				targetType: typeof(CommunityCenter),
+				targetMethod: "areAllAreasComplete",
+				patchMethod: nameof(HarmonyPatches.AreAllAreasComplete_Postfix)),
+			new Patch(
+				targetType: typeof(CommunityCenter),
+				targetMethod: "MakeMapModifications",
+				patchMethod: nameof(HarmonyPatches.MakeMapModifications_Postfix)),
+			new Patch(
+				targetType: typeof(CommunityCenter),
+				targetMethod: "checkForMissedRewards",
+				patchMethod: nameof(HarmonyPatches.CheckForMissedRewards_Postfix)),
+
 			// Area completion methods:
+			new Patch(
+				targetType: typeof(CommunityCenter),
+				targetMethod: "doCheckForNewJunimoNotes",
+				patchMethod: nameof(HarmonyPatches.DoCheckForNewJunimoNotes_Postfix)),
 			new Patch(
 				targetType: typeof(CommunityCenter),
 				targetMethod: "startGoodbyeDance",
@@ -155,11 +181,11 @@ namespace CustomCommunityCentre
 			Harmony harmony = new Harmony(id: id);
 			foreach (Patch patch in Patches)
 			{
-				Log.D($"Applying Harmony patch {patch.TargetType}_{patch.PatchMethod}",
+				Log.D($"Applying Harmony patch {patch.TargetType}{PatchDelimiter}{patch.PatchMethod}",
 					ModEntry.Config.DebugMode);
 
 				// Generate patch method
-				string harmonyTypeName = patch.PatchMethod.Split('_').Last();
+				string harmonyTypeName = patch.PatchMethod.Split(PatchDelimiter).Last();
 				HarmonyPatchType harmonyType = (HarmonyPatchType)Enum.Parse(
 					enumType: typeof(HarmonyPatchType),
 					value: harmonyTypeName);
@@ -189,7 +215,7 @@ namespace CustomCommunityCentre
 
 		private static void ErrorHandler(Exception e)
 		{
-			Log.E($"Error in Harmony patch.{Environment.NewLine}{e}");
+			Log.E($"Error in Harmony patch:{Environment.NewLine}{e}");
 		}
 
 		public static void Junimo_ctor_Postfix(
@@ -200,22 +226,23 @@ namespace CustomCommunityCentre
 			if (whichArea >= Bundles.CustomAreaInitialIndex
 				&& !Bundles.IsAbandonedJojaMartBundleAvailableOrComplete())
 			{
-				BundleMetadata bundleMetadata = Bundles.BundleMetadata
-					.First(bmd => Bundles.GetAreaNumberFromName(bmd.AreaName) == whichArea);
+				BundleMetadata bundleMetadata = Bundles.CustomBundleMetadata
+					.First(bmd => Bundles.GetCustomAreaNumberFromName(bmd.AreaName) == whichArea);
 
-				if (position == Vector2.Zero)
+				__instance.friendly.Value = Bundles.IsAreaComplete(cc: Bundles.CC, areaNumber: whichArea);
+
+				int restoreAreaPhase = Reflection.GetField
+						<int>
+						(obj: Bundles.CC, name: "restoreAreaPhase")
+					.GetValue();
+				if (restoreAreaPhase != CommunityCenter.PHASE_junimoAppear)
 				{
-					Vector2 noteTileLocation = Utility.PointToVector2(bundleMetadata.NoteTileLocation);
-					noteTileLocation += bundleMetadata.JunimoOffsetFromNoteTileLocation;
-					__instance.Position = noteTileLocation * Game1.tileSize;
+					Reflection.GetField
+							<Netcode.NetColor>
+							(obj: __instance, name: "color")
+						.GetValue()
+						.Set(bundleMetadata.JunimoColour);
 				}
-
-				Reflection.GetField
-						<Netcode.NetColor>
-						(obj: __instance, name: "color")
-					.GetValue()
-					.Set(bundleMetadata.JunimoColour);
-				// TODO: FIX: Junimo colour in area completion dance is set for all junimos
 			}
 		}
 
@@ -239,18 +266,26 @@ namespace CustomCommunityCentre
 			return true;
 		}
 
-		public static void HasCompletedCommunityCenter_Postfix(
-			Farmer __instance,
-			ref bool __result)
+		public static void GetRewardNameForArea_Postfix(
+			JunimoNoteMenu __instance,
+			int whichArea,
+			ref string __result)
 		{
-			bool resultModifier = Bundles.HasOrWillReceiveAreaCompletedMailForAllCustomAreas();
-			__result &= resultModifier;
+			BundleMetadata bundleMetadata = Bundles.GetCustomBundleMetadataFromAreaNumber(whichArea);
+
+			if (bundleMetadata == null || !Bundles.IsCustomArea(whichArea) || Bundles.IsCommunityCentreComplete(Bundles.CC))
+				return;
+
+			__result = BundleMetadata.GetLocalisedString(
+				dict: bundleMetadata.AreaRewardMessage,
+				defaultValue: "???");
 		}
 
 		public static bool LoadArea_Prefix(
 			CommunityCenter __instance,
 			int area)
 		{
+			/*
 			try
 			{
 				if ((area == CommunityCenter.AREA_Bulletin2 && !__instance.areasComplete[CommunityCenter.AREA_Bulletin])
@@ -263,6 +298,7 @@ namespace CustomCommunityCentre
 			{
 				HarmonyPatches.ErrorHandler(e);
 			}
+			*/
 			return true;
 		}
 
@@ -271,8 +307,8 @@ namespace CustomCommunityCentre
 			int area)
 		{
 			string areaName = CommunityCenter.getAreaNameFromNumber(area);
-			string mail = string.Format(Bundles.MailAreaCompleted, string.Join(string.Empty, areaName.Split(' ')));
-			if (area >= Bundles.CustomAreaInitialIndex && !Game1.MasterPlayer.hasOrWillReceiveMail(mail))
+			string mail = string.Format(Bundles.MailAreaCompleted, Bundles.GetAreaNameAsAssetKey(areaName));
+			if (string.IsNullOrEmpty(areaName) || Bundles.IsCustomArea(area) && !Game1.MasterPlayer.hasOrWillReceiveMail(mail))
 			{
 				// Add some mail flag to this bundle to indicate completion
 				Log.D($"Sending mail for custom bundle completion ({mail})",
@@ -306,7 +342,7 @@ namespace CustomCommunityCentre
 				// Set default area for menu view with custom areas
 				if (!isAreaSet
 					&& fromGameMenu && !fromThisMenu && !isAreaSet
-					&& cc.shouldNoteAppearInArea(areaNumber) && !cc.areasComplete[areaNumber])
+					&& cc.shouldNoteAppearInArea(areaNumber) && !Bundles.IsAreaComplete(cc: cc, areaNumber: areaNumber))
 				{
 					area = areaNumber;
 					whichAreaField.SetValue(area);
@@ -325,8 +361,6 @@ namespace CustomCommunityCentre
 				if (isAreaSet && isNavigationSet)
 					break;
 			}
-
-			ModEntry.Instance._lastJunimoNoteMenuArea.Value = area;
 		}
 
 		public static void CommunityCenter_ctor_Postfix(
@@ -341,26 +375,50 @@ namespace CustomCommunityCentre
 			__instance.modData.Remove(Bundles.KeyMutexes);
 		}
 
-		public static void SetUpLocationSpecificFlair_Postfix(
-			GameLocation __instance)
-		{
-			if (!(__instance is CommunityCenter cc))
-				return;
-
-			if ((Game1.MasterPlayer.hasCompletedCommunityCenter()
-				|| (cc.currentEvent != null && cc.currentEvent.id == (int)Bundles.EventIds.CommunityCentreComplete)))
-			{
-				Bundles.DrawStarInCommunityCentre(cc);
-			}
-		}
-
 		public static void ResetSharedState_Postfix(
 			CommunityCenter __instance)
 		{
-			if (__instance.areasComplete.Length > Bundles.DefaultMaxArea + 1)
+			if (Game1.MasterPlayer.mailReceived.Contains("JojaMember"))
+				return;
+			
+			if (__instance.areAllAreasComplete())
 			{
-				__instance.numberOfStarsOnPlaque.Value -= 2;
+				if (Bundles.AreAnyCustomAreasLoaded())
+				{
+					__instance.numberOfStarsOnPlaque.Value += 1;
+				}
 			}
+			else
+			{
+				foreach (int areaNumber in Bundles.CustomAreasComplete.Keys)
+				{
+					bool shouldNoteAppearInArea = false;
+					HarmonyPatches.ShouldNoteAppearInArea_Postfix(
+						__instance: __instance,
+						__result: ref shouldNoteAppearInArea,
+						area: areaNumber);
+					if (shouldNoteAppearInArea)
+					{
+						string areaName = Bundles.GetCustomAreaNameFromNumber(areaNumber);
+						BundleMetadata bundleMetadata = Bundles.CustomBundleMetadata
+							.First(bmd => bmd.AreaName == areaName);
+
+						Vector2 tileLocation = Utility.PointToVector2(bundleMetadata.NoteTileLocation);
+						tileLocation += bundleMetadata.JunimoOffsetFromNoteTileLocation;
+
+						Junimo j = new Junimo(position: tileLocation * Game1.tileSize, whichArea: areaNumber);
+						__instance.characters.Add(j);
+					}
+				}
+			}
+		}
+
+		public static void HasCompletedCommunityCenter_Postfix(
+			Farmer __instance,
+			ref bool __result)
+		{
+			bool resultModifier = Bundles.HasOrWillReceiveAreaCompletedMailForAllCustomAreas();
+			__result &= resultModifier;
 		}
 
 		public static void GetAreaBounds_Postfix(
@@ -368,10 +426,10 @@ namespace CustomCommunityCentre
 			ref Rectangle __result,
 			int area)
 		{
-			BundleMetadata bundleMetadata = Bundles.GetBundleMetadataFromAreaNumber(area);
+			BundleMetadata bundleMetadata = Bundles.GetCustomBundleMetadataFromAreaNumber(area);
 
 			// Override any overlapping bundle areas
-			foreach (BundleMetadata bmd in Bundles.BundleMetadata)
+			foreach (BundleMetadata bmd in Bundles.CustomBundleMetadata)
 			{
 				if ((bundleMetadata == null || bmd.AreaName != bundleMetadata.AreaName)
 					&& __result != Rectangle.Empty
@@ -411,9 +469,9 @@ namespace CustomCommunityCentre
 			ref string __result,
 			int areaNumber)
 		{
-			string name = Bundles.GetAreaNameFromNumber(areaNumber: areaNumber);
+			string name = Bundles.GetCustomAreaNameFromNumber(areaNumber: areaNumber);
 
-			if (areaNumber < Bundles.CustomAreaInitialIndex || Bundles.IsCommunityCentreComplete(__instance) || string.IsNullOrEmpty(name))
+			if (!Bundles.IsCustomArea(areaNumber) || Bundles.IsCommunityCentreComplete(__instance) || string.IsNullOrEmpty(name))
 				return;
 
 			__result = name;
@@ -424,10 +482,10 @@ namespace CustomCommunityCentre
 			ref int __result,
 			string name)
 		{
-			int id = Bundles.GetAreaNumberFromName(areaName: name);
+			int id = Bundles.GetCustomAreaNumberFromName(areaName: name);
 			bool isCommunityCentreComplete = Bundles.IsCommunityCentreComplete(Bundles.CC);
 
-			if (id < 0 || id > Bundles.CC.areasComplete.Length || isCommunityCentreComplete)
+			if (id < 0 || isCommunityCentreComplete)
 				return;
 
 			__result = id;
@@ -438,10 +496,10 @@ namespace CustomCommunityCentre
 			ref int __result,
 			Vector2 tileLocation)
 		{
-			BundleMetadata bundleMetadata = Bundles.BundleMetadata
+			BundleMetadata bundleMetadata = Bundles.CustomBundleMetadata
 				.FirstOrDefault(bmd => bmd.AreaBounds.Contains(Utility.Vector2ToPoint(tileLocation)));
 			int areaNumber = bundleMetadata != null
-				? Bundles.GetAreaNumberFromName(bundleMetadata.AreaName)
+				? Bundles.GetCustomAreaNumberFromName(bundleMetadata.AreaName)
 				: -1;
 
 			if (areaNumber < 0 || Bundles.IsCommunityCentreComplete(__instance))
@@ -455,13 +513,13 @@ namespace CustomCommunityCentre
 			ref string __result,
 			int areaNumber)
 		{
-			BundleMetadata bundleMetadata = Bundles.GetBundleMetadataFromAreaNumber(areaNumber);
+			BundleMetadata bundleMetadata = Bundles.GetCustomBundleMetadataFromAreaNumber(areaNumber);
 
-			if (areaNumber < Bundles.CustomAreaInitialIndex || Bundles.IsCommunityCentreComplete(Bundles.CC) || bundleMetadata == null)
+			if (!Bundles.IsCustomArea(areaNumber) || Bundles.IsCommunityCentreComplete(Bundles.CC) || bundleMetadata == null)
 				return;
 
 			string displayName = BundleMetadata.GetLocalisedString(
-				dict: bundleMetadata.AreaDisplayNames,
+				dict: bundleMetadata.AreaDisplayName,
 				defaultValue: bundleMetadata.AreaName,
 				code: LocalizedContentManager.LanguageCode.en);
 			__result = displayName;
@@ -472,13 +530,13 @@ namespace CustomCommunityCentre
 			ref string __result,
 			int areaNumber)
 		{
-			BundleMetadata bundleMetadata = Bundles.GetBundleMetadataFromAreaNumber(areaNumber);
+			BundleMetadata bundleMetadata = Bundles.GetCustomBundleMetadataFromAreaNumber(areaNumber);
 
-			if (areaNumber < Bundles.CustomAreaInitialIndex || Bundles.IsCommunityCentreComplete(Bundles.CC) || bundleMetadata == null)
+			if (!Bundles.IsCustomArea(areaNumber) || Bundles.IsCommunityCentreComplete(Bundles.CC) || bundleMetadata == null)
 				return;
 
 			string displayName = BundleMetadata.GetLocalisedString(
-				dict: bundleMetadata.AreaDisplayNames,
+				dict: bundleMetadata.AreaDisplayName,
 				defaultValue: bundleMetadata.AreaName);
 			__result = displayName;
 		}
@@ -488,13 +546,13 @@ namespace CustomCommunityCentre
 			ref bool __result,
 			int area)
 		{
-			BundleMetadata bundleMetadata = Bundles.GetBundleMetadataFromAreaNumber(area);
+			BundleMetadata bundleMetadata = Bundles.GetCustomBundleMetadataFromAreaNumber(area);
 			bool isCommunityCentreComplete = Bundles.IsCommunityCentreComplete(__instance);
 
-			if (area < Bundles.CustomAreaInitialIndex || isCommunityCentreComplete || bundleMetadata == null)
+			if (!Bundles.IsCustomArea(area) || isCommunityCentreComplete || bundleMetadata == null)
 				return;
 
-			bool isAreaComplete = Bundles.IsAreaCompleteAndLoaded(cc: __instance, areaNumber: area);
+			bool isAreaComplete = Bundles.IsAreaComplete(cc: __instance, areaNumber: area);
 			int required = bundleMetadata.BundlesRequired;
 			__result = __instance.numberOfCompleteBundles() >= required && !isAreaComplete;
 		}
@@ -524,15 +582,146 @@ namespace CustomCommunityCentre
 			return true;
 		}
 
+		public static bool MarkAreaAsComplete_Prefix(
+			CommunityCenter __instance,
+			int area)
+		{
+			try
+			{
+				if (Bundles.IsCustomArea(area))
+				{
+					if (Game1.currentLocation is CommunityCenter)
+					{
+						Bundles.CustomAreasComplete[area] = true;
+
+						if (__instance.areAllAreasComplete())
+						{
+							Reflection.GetField
+								<bool>
+								(obj: __instance, name: "_isWatchingJunimoGoodbye")
+								.SetValue(true);
+						}
+					}
+					return false;
+				}
+			}
+			catch (Exception e)
+			{
+				HarmonyPatches.ErrorHandler(e);
+			}
+			return true;
+		}
+
+		public static void GetNumberOfAreasComplete_Postfix(
+			CommunityCenter __instance,
+			ref int __result)
+		{
+			//__result = Bundles.GetTotalAreasComplete(__instance);
+		}
+
+		public static void AreAllAreasComplete_Postfix(
+			CommunityCenter __instance,
+			ref bool __result)
+		{
+			bool resultModifier = Bundles.AreaAllCustomAreasComplete(__instance);
+			__result &= resultModifier;
+		}
+
+		public static void MakeMapModifications_Postfix(
+			CommunityCenter __instance)
+		{
+			if (!Game1.MasterPlayer.mailReceived.Contains("JojaMember") && !__instance.areAllAreasComplete())
+			{
+				foreach (int areaNumber in Bundles.CustomAreasComplete.Keys)
+				{
+					if (__instance.shouldNoteAppearInArea(area: areaNumber))
+					{
+						__instance.addJunimoNote(area: areaNumber);
+					}
+					else if (Bundles.IsCustomAreaComplete(areaNumber))
+					{
+						__instance.loadArea(area: areaNumber, showEffects: false);
+					}
+				}
+			}
+		}
+
+		// TODO: FIX: 'Whiff' sprite on interacting with missedRewardsChest while only custom rewards are unclaimed.
+		// Related to base method behaviour: if (... || areasComplete.Count() <= area || ...) continue;
+
+		public static void CheckForMissedRewards_Postfix(
+			CommunityCenter __instance)
+		{
+			Dictionary<int, int[]> areaNumbersAndBundleNumbers = Bundles.GetAllCustomAreaNumbersAndBundleNumbers();
+			List<Item> rewards = new List<Item>();
+
+			foreach (KeyValuePair<int, int[]> areaAndBundles in areaNumbersAndBundleNumbers)
+			{
+				bool isUnclaimed = areaAndBundles.Value
+					.All(bundleNumber => __instance.bundleRewards.TryGetValue(bundleNumber, out bool isUnclaimed) && isUnclaimed);
+				if (!isUnclaimed)
+					continue;
+
+				rewards.Clear();
+				JunimoNoteMenu.GetBundleRewards(areaAndBundles.Key, rewards);
+				foreach (Item item in rewards)
+				{
+					__instance.missedRewardsChest.Value.addItem(item);
+				}
+			}
+
+			bool isRewardsListClear = Game1.netWorldState.Value.BundleRewards.Values.All(isUnclaimed => !isUnclaimed);
+
+			if ((!isRewardsListClear && !__instance.missedRewardsChestVisible.Value)
+				|| (isRewardsListClear && __instance.missedRewardsChestVisible.Value))
+			{
+				__instance.showMissedRewardsChestEvent.Fire(arg: !isRewardsListClear);
+				if (isRewardsListClear)
+				{
+					Multiplayer multiplayer = Reflection.GetField
+						<Multiplayer>
+						(type: typeof(Game1), name: "multiplayer")
+						.GetValue();
+					Vector2 missedRewardsChestTile = Reflection.GetField
+						<Vector2>
+						(obj: __instance, name: "missedRewardsChestTile")
+						.GetValue();
+
+					TemporaryAnimatedSprite sprite = new TemporaryAnimatedSprite(
+						rowInAnimationTexture: (Game1.random.NextDouble() < 0.5) ? 5 : 46,
+						position: (missedRewardsChestTile * Game1.tileSize) + new Vector2(Game1.smallestTileSize),
+						color: Color.White)
+					{
+						layerDepth = 1f
+					};
+					multiplayer.broadcastSprites(location: __instance, sprites: sprite);
+				}
+			}
+			__instance.missedRewardsChestVisible.Value = !isRewardsListClear;
+		}
+
+		public static void DoCheckForNewJunimoNotes_Postfix(
+			CommunityCenter __instance)
+		{
+			if (!(Game1.currentLocation is CommunityCenter))
+				return;
+			
+			foreach (int areaNumber in Bundles.CustomAreasComplete.Keys)
+			{
+				if (!__instance.isJunimoNoteAtArea(areaNumber) && __instance.shouldNoteAppearInArea(areaNumber))
+				{
+					__instance.addJunimoNoteViewportTarget(areaNumber);
+				}
+			}
+		}
+
 		/// <summary>
 		/// Add junimos for extra bundles to the CC completion goodbye dance.
 		/// </summary>
 		public static void StartGoodbyeDance_Prefix(
 			CommunityCenter __instance)
 		{
-			Bundles.DrawStarInCommunityCentre(__instance);
-
-			HarmonyPatches.SetUpJunimosForGoodbyeDance(cc: __instance);
+			Bundles.SetUpJunimosForGoodbyeDance(cc: __instance);
 			List<Junimo> junimos = __instance.getCharacters().OfType<Junimo>().ToList();
 			foreach (Junimo junimo in junimos)
 			{
@@ -540,63 +729,26 @@ namespace CustomCommunityCentre
 			}
 		}
 
-		/// <summary>
-		/// Add junimos for extra bundles to the CC completion goodbye dance.
-		/// </summary>
-		public static void JunimoGoodbyeDance_Prefix(
-			CommunityCenter __instance)
-		{
-			HarmonyPatches.SetUpJunimosForGoodbyeDance(cc: __instance);
-		}
-
-		private static void SetUpJunimosForGoodbyeDance(CommunityCenter cc)
-		{
-			List<Junimo> junimos = cc.getCharacters().OfType<Junimo>().ToList();
-			Vector2 min = new Vector2(junimos.Min(j => j.Position.X), junimos.Min(j => j.Position.Y));
-			Vector2 max = new Vector2(junimos.Max(j => j.Position.X), junimos.Max(j => j.Position.Y));
-			for (int i = 0; i < Bundles.CustomAreaNameAndNumberDictionary.Count; ++i)
-			{
-				Junimo junimo = cc.getJunimoForArea(Bundles.CustomAreaInitialIndex + i);
-
-				int xOffset = i * Game1.tileSize;
-				Vector2 position;
-				position.X = Game1.random.NextDouble() < 0.5f
-					? min.X - Game1.tileSize - xOffset
-					: max.X + Game1.tileSize + xOffset;
-				position.Y = Game1.random.NextDouble() < 0.5f
-					? min.Y
-					: max.Y;
-
-				junimo.Position = min + (position * Game1.tileSize);
-
-				// Do as in the target method
-				junimo.stayStill();
-				junimo.faceDirection(1);
-				junimo.fadeBack();
-				junimo.IsInvisible = false;
-				junimo.setAlpha(1f);
-			}
-		}
-
-		/// <summary>
-		/// Return the area completion string for bundles above 6.
-		/// </summary>
 		public static void GetMessageForAreaCompletion_Postfix(
 			CommunityCenter __instance,
 			ref string __result)
 		{
-			if (!Bundles.IsAbandonedJojaMartBundleAvailableOrComplete())
-			{
-				int which = __instance.areasComplete.Count(isComplete => isComplete);
-				string message = Game1.content.LoadString(
-					$@"Strings/Locations:CommunityCenter_AreaCompletion{which}",
-					Game1.player.Name);
+			int areaNumber = Reflection.GetField
+					<int>
+					(obj: __instance, name: "restoreAreaIndex")
+				.GetValue();
+			string areaName = Bundles.GetCustomAreaNameFromNumber(areaNumber);
 
-				if (string.IsNullOrWhiteSpace(message))
-					return;
+			if (areaNumber < Bundles.DefaultMaxArea
+				|| string.IsNullOrWhiteSpace(areaName)
+				|| Bundles.IsAbandonedJojaMartBundleAvailableOrComplete())
+				return;
+			
+			string message = Game1.content.LoadString(
+				$@"Strings/Locations:CommunityCenter_AreaCompletion_{Bundles.GetAreaNameAsAssetKey(areaName)}",
+				Game1.player.Name);
 
-				__result = message;
-			}
+			__result = message;
 		}
 	}
 }

@@ -15,11 +15,10 @@ namespace CustomCommunityCentre
 		public Vector2 JunimoOffsetFromNoteTileLocation;
 		public int BundlesRequired;
 		public string JunimoColourName;
-		public Dictionary<string, string> AreaDisplayNames;
-		public Dictionary<string, string> AreaRewardNames;
-		public Dictionary<string, string> AreaCompletionMessage;
+		public Dictionary<string, string> AreaDisplayName;
+		public Dictionary<string, string> AreaRewardMessage;
+		public Dictionary<string, string> AreaCompleteDialogue;
 		public Dictionary<string, Dictionary<string, string>> BundleDisplayNames;
-
 
 		public Color JunimoColour
 		{
