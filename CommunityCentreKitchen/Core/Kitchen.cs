@@ -1,23 +1,23 @@
-﻿using Microsoft.Xna.Framework;
+﻿using CustomCommunityCentre;
+using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Locations;
 using StardewValley.Menus;
 using StardewValley.Objects;
+using StardewValley.Util;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using xTile.Tiles;
 
-namespace CustomCommunityCentre
+namespace CommunityCentreKitchen
 {
 	public static class Kitchen
 	{
 		private static IModHelper Helper => ModEntry.Instance.Helper;
 		private static IReflectionHelper Reflection => ModEntry.Instance.Helper.Reflection;
-		private static ITranslationHelper i18n => ModEntry.Instance.Helper.Translation;
-		private static Config Config => ModEntry.Config;
 
 		// Kitchen definitions
 		public const string KitchenAreaName = "Kitchen";
@@ -42,31 +42,21 @@ namespace CustomCommunityCentre
 
 		internal static void RegisterEvents()
 		{
-			Helper.Events.GameLoop.DayStarted += Kitchen.GameLoop_DayStarted;
 			Helper.Events.Input.ButtonPressed += Kitchen.Input_ButtonPressed;
 			Helper.Events.Display.MenuChanged += Kitchen.Display_MenuChanged;
 
 			CustomCommunityCentre.Events.LoadedArea += Kitchen.OnLoadedArea;
 		}
 
-		internal static void SaveLoadedBehaviours(CommunityCenter cc)
+		internal static void AddConsoleCommands(string cmd)
 		{
 			// . . .
-		}
-
-		private static void GameLoop_DayStarted(object sender, DayStartedEventArgs e)
-		{
-			if (Bundles.IsCommunityCentreComplete(Bundles.CC))
-			{
-				Kitchen.SetUpKitchen();
-			}
 		}
 
 		private static void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
 		{
 			// In-game interactions
-			if (!Game1.game1.IsActive || Game1.currentLocation == null || !Context.IsWorldReady
-				|| !(Game1.currentLocation is CommunityCenter cc) || !Kitchen.IsKitchenComplete(cc))
+			if (!Game1.game1.IsActive || Game1.currentLocation == null || !Context.IsWorldReady)
 				return;
 
 			// . . .
@@ -80,49 +70,29 @@ namespace CustomCommunityCentre
 				// Tile actions
 				Tile tile = Game1.currentLocation.Map.GetLayer("Buildings")
 					.Tiles[(int)e.Cursor.GrabTile.X, (int)e.Cursor.GrabTile.Y];
-				if (tile == null)
-					return;
-
-				// Use Community Centre kitchen as a cooking station
-				if (Kitchen.CookingTileIndexes[Kitchen.FridgeTilesToUse].Contains(tile.TileIndex))
+				if (tile != null)
 				{
-					Netcode.NetRef<Chest> netChest = new Netcode.NetRef<Chest>
+					if (Game1.currentLocation is CommunityCenter cc && Kitchen.IsKitchenComplete(Bundles.CC))
 					{
-						Value = (Chest)cc.Objects[Kitchen.FridgeChestPosition]
-					};
-					cc.ActivateKitchen(fridge: netChest);
+						// Use Community Centre kitchen as a cooking station
+						if (Kitchen.CookingTileIndexes[Kitchen.FridgeTilesToUse].Contains(tile.TileIndex))
+						{
+							Kitchen.TryOpenCookingMenu(cc);
+							Helper.Input.Suppress(e.Button);
 
-					Helper.Input.Suppress(e.Button);
-					return;
-				}
+							return;
+						}
 
-				// Open Community Centre fridge door
-				if (tile.TileIndex == Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1])
-				{
-					// Open the fridge as a chest
-					Point tileLocation = Utility.Vector2ToPoint(Kitchen.FridgeTilePosition);
-					if (((Chest)cc.Objects[Kitchen.FridgeChestPosition]).checkForAction(Game1.player))
-					{
-						// Change tile to use custom open-fridge sprite
-						Game1.currentLocation.Map.GetLayer("Front")
-							.Tiles[tileLocation.X, tileLocation.Y - 1]
-							.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][2];
-						Game1.currentLocation.Map.GetLayer("Buildings")
-							.Tiles[tileLocation.X, tileLocation.Y]
-							.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][3];
+						// Open Community Centre fridge door
+						if (tile.TileIndex == Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1])
+						{
+							// Open the fridge as a chest
+							Kitchen.TrySetFridgeDoor(cc: cc, isOpening: true);
+							Helper.Input.Suppress(e.Button);
+
+							return;
+						}
 					}
-					else
-					{
-						cc.Map.GetLayer("Front")
-							.Tiles[tileLocation.X, tileLocation.Y - 1]
-							.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][0];
-						cc.Map.GetLayer("Buildings")
-							.Tiles[tileLocation.X, tileLocation.Y]
-							.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1];
-					}
-
-					Helper.Input.Suppress(e.Button);
-					return;
 				}
 			}
 		}
@@ -133,21 +103,12 @@ namespace CustomCommunityCentre
 				return;
 
 			// Close Community Centre fridge door after use in the renovated kitchen
-			Point tile = Utility.Vector2ToPoint(Kitchen.FridgeTilePosition);
-			if (e.OldMenu is ItemGrabMenu && e.NewMenu == null
-				&& Game1.currentLocation is CommunityCenter cc
-				&& (Bundles.IsCommunityCentreComplete(cc) || Kitchen.IsKitchenComplete(cc))
-				&& Kitchen.FridgeTilePosition != Vector2.Zero
-				&& cc.Map.GetLayer("Front").Tiles[tile.X, tile.Y - 1] is Tile tileA
-				&& cc.Map.GetLayer("Buildings").Tiles[tile.X, tile.Y] is Tile tileB
-				&& tileA != null && tileB != null)
+			bool isOldMenuCraftingPage = e.OldMenu is ItemGrabMenu || e.OldMenu is CraftingPage
+					|| nameof(e.OldMenu).EndsWith("CraftingPage", StringComparison.InvariantCultureIgnoreCase);
+			if (isOldMenuCraftingPage && e.NewMenu == null && Game1.currentLocation is CommunityCenter cc)
 			{
-				cc.Map.GetLayer("Front")
-					.Tiles[tile.X, tile.Y - 1]
-					.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][0];
-				cc.Map.GetLayer("Buildings")
-					.Tiles[tile.X, tile.Y]
-					.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1];
+				Kitchen.TrySetFridgeDoor(cc: cc, isOpening: false);
+
 				return;
 			}
 		}
@@ -158,18 +119,7 @@ namespace CustomCommunityCentre
 				return;
 
 			CommunityCenter cc = ((CustomCommunityCentre.LoadedAreaEventArgs)e).CommunityCenter;
-
-			// Fetch tile position for opening/closing fridge visually
-			Kitchen.FridgeTilesToUse = Helper.ModRegistry.IsLoaded("FlashShifter.StardewValleyExpandedCP") ? "SVE" : "Vanilla";
-			Kitchen.FridgeTilePosition = Kitchen.GetKitchenFridgeTilePosition(cc);
-
-			// Add community centre kitchen fridge container to the map for later
-			if (!cc.Objects.ContainsKey(Kitchen.FridgeChestPosition))
-			{
-				Chest chest = new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
-				cc.Objects.Add(Kitchen.FridgeChestPosition, chest);
-			}
-			((Chest)cc.Objects[Kitchen.FridgeChestPosition]).fridge.Value = true;
+			Kitchen.SetUpKitchen(cc);
 		}
 
 		public static bool IsKitchenLoaded(CommunityCenter cc)
@@ -192,16 +142,27 @@ namespace CustomCommunityCentre
 			bool noCustomAreas = kitchenNumber < 0 || Bundles.AreAnyCustomAreasLoaded();
 			bool customAreasComplete = noCustomAreas || Bundles.IsCustomAreaComplete(kitchenNumber);
 			bool ccIsComplete = Bundles.IsCommunityCentreComplete(cc);
-			Log.T($"IsCommunityCentreKitchenComplete: (mail: {receivedMail}) || (entries: {noCustomAreas}) || (areas: {customAreasComplete}) || (cc: {ccIsComplete})");
 			return receivedMail || noCustomAreas || customAreasComplete || ccIsComplete;
 		}
 
-		internal static void SetUpKitchen()
+		internal static void SetUpKitchen(CommunityCenter cc)
 		{
 			Helper.Content.InvalidateCache(@"LooseSprites/JunimoNote");
 			Helper.Content.InvalidateCache(@"Maps/townInterior");
 			Helper.Content.InvalidateCache(@"Strings/Locations");
 			Helper.Content.InvalidateCache(@"Strings/UI");
+
+			// Fetch tile position for opening/closing fridge visually
+			Kitchen.FridgeTilesToUse = Helper.ModRegistry.IsLoaded("FlashShifter.StardewValleyExpandedCP") ? "SVE" : "Vanilla";
+			Kitchen.FridgeTilePosition = Kitchen.GetKitchenFridgeTilePosition(cc);
+
+			// Add community centre kitchen fridge container to the map for later
+			if (!cc.Objects.ContainsKey(Kitchen.FridgeChestPosition))
+			{
+				Chest chest = new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
+				cc.Objects.Add(Kitchen.FridgeChestPosition, chest);
+			}
+			((Chest)cc.Objects[Kitchen.FridgeChestPosition]).fridge.Value = true;
 		}
 
 		public static Chest GetKitchenFridge(CommunityCenter cc)
@@ -244,6 +205,39 @@ namespace CustomCommunityCentre
 		public static bool HasOrWillReceiveKitchenCompletedMail()
 		{
 			return Game1.MasterPlayer.hasOrWillReceiveMail(string.Format(Bundles.MailAreaCompleted, Kitchen.KitchenAreaName));
+		}
+
+		private static void TryOpenCookingMenu(CommunityCenter cc)
+		{
+			Netcode.NetRef<Chest> netChest = new Netcode.NetRef<Chest>
+			{
+				Value = (Chest)cc.Objects[Kitchen.FridgeChestPosition]
+			};
+			cc.ActivateKitchen(fridge: netChest);
+		}
+
+		private static bool TrySetFridgeDoor(CommunityCenter cc, bool isOpening)
+		{
+			Point tilePosition = Utility.Vector2ToPoint(Kitchen.FridgeTilePosition);
+			if ((Bundles.IsCommunityCentreComplete(cc) || Kitchen.IsKitchenComplete(cc))
+				&& Kitchen.FridgeTilePosition != Vector2.Zero
+				&& cc.Map.GetLayer("Front").Tiles[tilePosition.X, tilePosition.Y - 1] is Tile tileA
+				&& cc.Map.GetLayer("Buildings").Tiles[tilePosition.X, tilePosition.Y] is Tile tileB
+				&& tileA != null && tileB != null)
+			{
+				if (!isOpening || ((Chest)cc.Objects[Kitchen.FridgeChestPosition]).checkForAction(Game1.player))
+				{
+					tileA.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][0];
+					tileB.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1];
+				}
+				else
+				{
+					tileA.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][2];
+					tileB.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][3];
+				}
+				return true;
+			}
+			return false;
 		}
 	}
 }

@@ -15,7 +15,13 @@
 			"X": 0.0,
 			"Y": 2.0
 		},
-		"BundlesRequired": 0, //2,
+		"JunimoCutsceneLocation": "Town",
+		"JunimoCutsceneTileLocation":
+		{
+			"X": 43,
+			"Y": 70
+		},
+		"BundlesRequired": 2,
 		"JunimoColourName": "MediumPurple",
 		"AreaDisplayName": {
 			"en": "Kitchen",
@@ -32,7 +38,7 @@
 			"zh": "厨房"
 		},
 		"AreaRewardMessage": {
-			"en": "Reward: Cooking stuff",
+			"en": "Reward: Saloon delivery",
 			"de": "Belohnung: Kochzeugs",
 			"es": "Recompensa: Cocina",
 			"fr": "Récompense : Cuisine",

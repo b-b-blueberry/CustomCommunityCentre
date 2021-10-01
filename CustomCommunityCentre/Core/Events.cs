@@ -18,6 +18,13 @@ namespace CustomCommunityCentre
 		}
 	}
 
+	public class AreaCompletedEventArgs : EventArgs
+	{
+		public string AreaName { get; }
+		public int AreaNumber { get; }
+		public int WhichEvent { get; }
+	}
+
 
 	public class Events
 	{

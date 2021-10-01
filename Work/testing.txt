@@ -2,7 +2,7 @@
 	✔	Add CC values
 	✔	Add NetWorldState values
 	✔	Add multiplayer values
-	✔		Join as peer
+		✔	Join as peer
 
 ✔	Unload custom data
 	✔	Clear CC values
@@ -11,19 +11,19 @@
 
 ✔	Donate item
 	✔	Persistent bundle progress
-	✔		Overnight
-			Unload bundle
-			Reinstall
-		Preserved donated items
-		Multiplayer synchronised progress
+		✔	Overnight
+		✔	Unload bundle
+		✔	Reinstall
+	✔	Preserved donated items
+	✔	Multiplayer synchronised progress
 
-	Complete bundle
-		Persistent bundle progress
-			Overnight
-			Unload bundle
-			Reinstall
-		Preserved rewards
-		Multiplayer synchronised progress
+✔	Complete bundle
+	✔	Persistent bundle progress
+		✔	Overnight
+		✔	Unload bundle
+		✔	Reinstall
+	✔	Preserved rewards
+	✔	Multiplayer synchronised progress
 
 	Complete area
 		Persistent area progress
@@ -34,9 +34,9 @@
 			All bundles fields true
 		Multiplayer synchronised progress
 		Mail received
-			ccArea
-			prefix.area_completed_followup
-			prefix.area_reward_guarantee
+		✔	ccArea
+			Area_completed_followup
+			Area_reward_guarantee
 
 	Complete base areas only
 		CC must not complete while custom metadata loaded
@@ -51,11 +51,11 @@
 
 	Complete JMWH
 
-	Load 1 custom area
+✔	Load 1 custom area
 
 	Load 2 custom areas
 
-	Change custom areas during play
+✔	Change custom areas during play
 
 	Change custom areas between CC complete and AJM
 
@@ -73,3 +73,20 @@
 			✔	1 area
 			✔	2 areas
 				4 areas
+
+	Gus delivery
+		Singleplayer
+			1 item
+			4 items
+			Sound plays indoors
+		Multiplayer
+			1 item
+			4 items
+			Gus appears per player
+			Sounds played per player
+			Items per player
+			Multiple items per order
+			Order from indoors
+			Place new order while old order in transit
+			Place new order while old order leaving
+			Try take other player's box

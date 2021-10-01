@@ -1,17 +1,19 @@
 ﻿using StardewModdingAPI;
 
-namespace CustomCommunityCentre
+namespace CustomCommunityCentre.API
 {
-	public interface ICommunityCentreKitchenAPI
+	// TODO: Repopulate API methods
+
+	public interface ICustomCommunityCentreAPI
 	{
 		StardewValley.Locations.CommunityCenter GetCommunityCentre();
 	}
 
-	public class CommunityCentreKitchenAPI
+	public class CustomCommunityCentreAPI
 	{
 		private readonly IReflectionHelper Reflection;
 
-		public CommunityCentreKitchenAPI(IReflectionHelper reflection)
+		public CustomCommunityCentreAPI(IReflectionHelper reflection)
 		{
 			this.Reflection = reflection;
 		}

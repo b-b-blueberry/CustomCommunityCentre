@@ -1,0 +1,15 @@
+﻿{
+    "Name": "[CCC] Community Centre Kitchen",
+    "Author": "blueberry",
+    "Version": "1.0.0",
+    "Description": "Adds a new Kitchen area to the Community Centre.",
+    "UniqueID": "blueberry.CommunityCentreKitchen",
+    "EntryDll": "CommunityCentreKitchen.dll",
+    "MinimumApiVersion": "3.12.0",
+    "UpdateKeys": [ "Nexus:????" ],
+    "Dependencies": [
+        {
+            "UniqueID": "blueberry.CustomCommunityCentre"
+        }
+    ]
+}

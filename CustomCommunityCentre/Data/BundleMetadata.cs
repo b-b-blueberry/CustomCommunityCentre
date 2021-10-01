@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using StardewValley;
 
-namespace CustomCommunityCentre
+namespace CustomCommunityCentre.Data
 {
 	public class BundleMetadata
 	{
@@ -13,6 +13,8 @@ namespace CustomCommunityCentre
 		public Rectangle AreaBounds;
 		public Point NoteTileLocation;
 		public Vector2 JunimoOffsetFromNoteTileLocation;
+		public string JunimoCutsceneLocation = null;
+		public Point JunimoCutsceneTileLocation = Point.Zero;
 		public int BundlesRequired;
 		public string JunimoColourName;
 		public Dictionary<string, string> AreaDisplayName;
