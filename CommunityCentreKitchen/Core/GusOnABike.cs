@@ -3,9 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using Netcode;
 
 namespace CommunityCentreKitchen
 {
@@ -15,10 +13,10 @@ namespace CommunityCentreKitchen
 		{
 			public int SourceIndex = 0;
 			public int MaxSourceIndex = 4;
-			public Rectangle SourceRect = new Rectangle(0, 0, 32, 48);
-			public Rectangle ShadowSourceRect = new Rectangle(0, 48, 32, 8);
+			public Rectangle SourceRect = new(0, 0, 32, 48);
+			public Rectangle ShadowSourceRect = new(0, 48, 32, 8);
 			public float Scale = Game1.pixelZoom;
-			public string TextureAssetKey = CommunityCentreKitchen.AssetManager.GameDeliverySpritesPath;
+			public string TextureAssetKey = GusDeliveryService.DeliveryTextureAssetKey;
 			public Lazy<Texture2D> Texture;
 		}
 
@@ -34,28 +32,29 @@ namespace CommunityCentreKitchen
 		public new Sprite sprite;
 		public int BounceTimer = 0;
 		public int WaitTimer;
+		public bool DeliveryComplete = false;
 		public readonly Vector2 TargetPosition;
-		public readonly NetBool DeliveryComplete = new NetBool(false);
 
-		/*public readonly ICue SoundCue;
+		/*
+		public readonly ICue SoundCue;
 		public string SoundCueName = "cm:scooter_loop";
 		public int SoundRange = 1024;
 		private int SoundUpdateTimer;
-		private int MaxSoundUpdateTime = 100;*/
-
-		public NetFields NetFields { get; } = new NetFields();
+		private int MaxSoundUpdateTime = 100;
+		private int MaxFrequency = 100;
+		*/
 
 
 		public GusOnABike()
 		{
 			this.WaitTimer = (int)this.MaxWaitTime;
 
-			this.NetFields.AddFields(this.DeliveryComplete);
-
-			this.sprite = new Sprite();
-			this.sprite.Texture = GusDeliveryService.DeliveryTexture;
-			this.sprite.TextureAssetKey = GusDeliveryService.DeliveryTextureAssetKey;
 			this.flip = true;
+			this.sprite = new Sprite
+			{
+				Texture = GusDeliveryService.DeliveryTexture,
+				TextureAssetKey = GusDeliveryService.DeliveryTextureAssetKey
+			};
 
 			Farm farm = Game1.getFarm();
 			Vector2 mailboxPosition = Utility.PointToVector2(farm.mapMainMailboxPosition ?? Game1.MasterPlayer.getMailboxPosition());
@@ -64,13 +63,15 @@ namespace CommunityCentreKitchen
 				x: farm.Map.DisplayWidth + (this.sprite.SourceRect.Width * this.sprite.Scale * 10),
 				y: this.TargetPosition.Y);
 
-			/*this.SoundUpdateTimer = this.MaxSoundUpdateTime;
+			/*
+			this.SoundUpdateTimer = this.MaxSoundUpdateTime;
 			this.SoundCue = Game1.soundBank.GetCue(
 				"heavyEngine"
 				//this.SoundCueName
 				);
 			this.SoundCue.Play();
-			this.SoundCue.Pause();*/
+			this.SoundCue.Pause();
+			*/
 		}
 
 		internal static void Create()
@@ -99,11 +100,24 @@ namespace CommunityCentreKitchen
 			}
 		}
 
-		/*internal void StopSounds()
+		public static bool IsGusOnFarm()
 		{
-			SoundCue.SetVariable("Frequency", 100f);
+			bool isHe = Game1.getFarm().critters.Any(c => c is GusOnABike);
+			return isHe;
+		}
+
+		public static string WhereGus()
+		{
+			return Game1.getCharacterFromName(GusDeliveryService.ShopOwner).currentLocation?.Name;
+		}
+
+		/*
+		internal void StopSounds()
+		{
+			SoundCue.SetVariable("Frequency", GusOnABike.MaxFrequency);
 			SoundCue.Stop(Microsoft.Xna.Framework.Audio.AudioStopOptions.Immediate);
-		}*/
+		}
+		*/
 
 		public override bool update(GameTime time, GameLocation environment)
 		{
@@ -131,7 +145,9 @@ namespace CommunityCentreKitchen
 					* time.ElapsedGameTime.TotalSeconds);
 				this.position.X += tilesPerTick * Game1.tileSize * (this.flip ? -1 : 1);
 
-				//this.SoundCue.SetVariable("Frequency", 100f * speedRatio);
+				/*
+				this.SoundCue.SetVariable("Frequency", GusOnABike.MaxFrequency * speedRatio);
+				*/
 
 				// Bounce Gus on his bike every once in a while
 				if (speedRatio > 0.8f
@@ -148,12 +164,12 @@ namespace CommunityCentreKitchen
 				--this.WaitTimer;
 			}
 
-			if (!this.DeliveryComplete.Value)
+			if (!this.DeliveryComplete)
 			{
 				if (isAtTargetPosition && this.WaitTimer <= this.MaxWaitTime / 3)
 				{
 					// Complete delivery when Gus has driven to the target and waited a while
-					this.DeliveryComplete.Value = true;
+					this.DeliveryComplete = true;
 					GusDeliveryService.AddDeliveryChests();
 				}
 			}
@@ -168,12 +184,17 @@ namespace CommunityCentreKitchen
 				if (isAtEndPosition)
 				{
 					// Destroy Gus when he drives into the void
-					//this.StopSounds();
+
+					/*
+					this.StopSounds();
+					*/
+					
 					return true;
 				}
 			}
 
-			/*{
+			/*
+			{
 				// Ambient sound logic taken from StardewValley.BellsAndWhistles.AmbientLocationSounds
 				this.SoundUpdateTimer -= time.ElapsedGameTime.Milliseconds;
 				if (this.SoundUpdateTimer <= 0)
@@ -189,7 +210,8 @@ namespace CommunityCentreKitchen
 						this.SoundCue.Resume();
 					}
 				}
-			}*/
+			}
+			*/
 
 			return false;
 		}
@@ -211,8 +233,8 @@ namespace CommunityCentreKitchen
 				rect.X += this.sprite.ShadowSourceRect.Width * this.sprite.SourceIndex;
 
 				const float layerDepthDivisor = 5.5f;
-				float layerDepth // Why 5.5f and + 0.01f? I have no idea, but it works
-					= 0.01f + ((drawPosition.X / layerDepthDivisor) / 10000f) + ((drawPosition.Y / layerDepthDivisor - i) / 10000f); // NPC
+				float layerDepth // Why 5.5f and + 0.01f? I have no idea, but it works on the standard farm
+					= 0.01f + ((drawPosition.X / layerDepthDivisor) / 10000f) + ((drawPosition.Y / layerDepthDivisor - i) / 10000f);
 
 				b.Draw(
 					texture: this.sprite.Texture.Value,

@@ -6,7 +6,6 @@ using StardewValley;
 using StardewValley.Locations;
 using StardewValley.Menus;
 using StardewValley.Objects;
-using StardewValley.Util;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,31 +13,31 @@ using xTile.Tiles;
 
 namespace CommunityCentreKitchen
 {
+	// TODO: Translations for bundleMetadata area reward strings
 	public static class Kitchen
 	{
 		private static IModHelper Helper => ModEntry.Instance.Helper;
 		private static IReflectionHelper Reflection => ModEntry.Instance.Helper.Reflection;
 
 		// Kitchen definitions
-		public const string KitchenAreaName = "Kitchen";
+		public const string KitchenAreaName = "Custom_blueberry_Kitchen_Area0";
 
 		// Kitchen fridge
 		// We use Linus' tent interior for the dummy area, since there's surely no conceivable way it'd be in the community centre
-		public static readonly Rectangle FridgeOpenedSpriteArea = new Rectangle(32, 560, 16, 32);
-		public static readonly Vector2 FridgeChestPosition = new Vector2(6830);
+		public static readonly Rectangle FridgeOpenedSpriteArea = new(32, 560, 16, 32);
+		public static readonly Vector2 FridgeChestPosition = new(6830);
 		public static string FridgeTilesToUse = "Vanilla";
-		public static readonly Dictionary<string, int[]> FridgeTileIndexes = new Dictionary<string, int[]>
-		{
+		public static readonly Dictionary<string, int[]> FridgeTileIndexes = new()
+        {
 			{ "Vanilla", new [] { 602, 634, 1122, 1154 } },
 			{ "SVE", new [] { 432, 440, 432, 442 } }
 		};
-		public static readonly Dictionary<string, int[]> CookingTileIndexes = new Dictionary<string, int[]>
-		{
+		public static readonly Dictionary<string, int[]> CookingTileIndexes = new()
+        {
 			{ "Vanilla", new [] { 498, 499, 631, 632, 633 } },
 			{ "SVE", new [] { 498, 499, 631, 632, 633 } },
 		};
 		public static Vector2 FridgeTilePosition = Vector2.Zero;
-
 
 		internal static void RegisterEvents()
 		{
@@ -49,6 +48,16 @@ namespace CommunityCentreKitchen
 		}
 
 		internal static void AddConsoleCommands(string cmd)
+		{
+			// . . .
+		}
+
+		internal static void SaveLoadedBehaviours()
+		{
+			// . . .
+		}
+
+		internal static void DayStartedBehaviours()
 		{
 			// . . .
 		}
@@ -77,8 +86,7 @@ namespace CommunityCentreKitchen
 						// Use Community Centre kitchen as a cooking station
 						if (Kitchen.CookingTileIndexes[Kitchen.FridgeTilesToUse].Contains(tile.TileIndex))
 						{
-							Kitchen.TryOpenCookingMenu(cc);
-							Helper.Input.Suppress(e.Button);
+							Kitchen.TryOpenCookingMenu(cc: cc, button: e.Button);
 
 							return;
 						}
@@ -87,8 +95,7 @@ namespace CommunityCentreKitchen
 						if (tile.TileIndex == Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1])
 						{
 							// Open the fridge as a chest
-							Kitchen.TrySetFridgeDoor(cc: cc, isOpening: true);
-							Helper.Input.Suppress(e.Button);
+							Kitchen.TrySetFridgeDoor(cc: cc, isOpening: true, button: e.Button);
 
 							return;
 						}
@@ -127,7 +134,8 @@ namespace CommunityCentreKitchen
 			if (cc == null)
 				return false;
 
-			bool bundlesExist = Game1.netWorldState.Value.BundleData.Keys.Any(key => key.Split(Bundles.BundleKeyDelim).First() == Kitchen.KitchenAreaName);
+			bool bundlesExist = Game1.netWorldState.Value.BundleData.Keys
+				.Any(key => key.Split(Bundles.BundleKeyDelim).First() == Kitchen.KitchenAreaName);
 			return bundlesExist;
 		}
 
@@ -138,10 +146,10 @@ namespace CommunityCentreKitchen
 
 			int kitchenNumber = Bundles.GetCustomAreaNumberFromName(Kitchen.KitchenAreaName);
 
-			bool receivedMail = HasOrWillReceiveKitchenCompletedMail();
+			bool receivedMail = Kitchen.HasOrWillReceiveKitchenCompletedMail();
 			bool noCustomAreas = kitchenNumber < 0 || Bundles.AreAnyCustomAreasLoaded();
 			bool customAreasComplete = noCustomAreas || Bundles.IsCustomAreaComplete(kitchenNumber);
-			bool ccIsComplete = Bundles.IsCommunityCentreComplete(cc);
+			bool ccIsComplete = Bundles.IsCommunityCentreCompleteEarly(cc);
 			return receivedMail || noCustomAreas || customAreasComplete || ccIsComplete;
 		}
 
@@ -159,7 +167,7 @@ namespace CommunityCentreKitchen
 			// Add community centre kitchen fridge container to the map for later
 			if (!cc.Objects.ContainsKey(Kitchen.FridgeChestPosition))
 			{
-				Chest chest = new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
+				Chest chest = new (playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
 				cc.Objects.Add(Kitchen.FridgeChestPosition, chest);
 			}
 			((Chest)cc.Objects[Kitchen.FridgeChestPosition]).fridge.Value = true;
@@ -207,19 +215,24 @@ namespace CommunityCentreKitchen
 			return Game1.MasterPlayer.hasOrWillReceiveMail(string.Format(Bundles.MailAreaCompleted, Kitchen.KitchenAreaName));
 		}
 
-		private static void TryOpenCookingMenu(CommunityCenter cc)
+		private static void TryOpenCookingMenu(CommunityCenter cc, SButton button)
 		{
-			Netcode.NetRef<Chest> netChest = new Netcode.NetRef<Chest>
-			{
+			Helper.Input.Suppress(button);
+			Netcode.NetRef<Chest> netChest = new()
+            {
 				Value = (Chest)cc.Objects[Kitchen.FridgeChestPosition]
 			};
 			cc.ActivateKitchen(fridge: netChest);
 		}
 
-		private static bool TrySetFridgeDoor(CommunityCenter cc, bool isOpening)
+		private static bool TrySetFridgeDoor(CommunityCenter cc, bool isOpening, SButton? button = null)
 		{
+			if (button != null)
+			{
+				Helper.Input.Suppress(button.Value);
+			}
 			Point tilePosition = Utility.Vector2ToPoint(Kitchen.FridgeTilePosition);
-			if ((Bundles.IsCommunityCentreComplete(cc) || Kitchen.IsKitchenComplete(cc))
+			if (Kitchen.IsKitchenComplete(cc)
 				&& Kitchen.FridgeTilePosition != Vector2.Zero
 				&& cc.Map.GetLayer("Front").Tiles[tilePosition.X, tilePosition.Y - 1] is Tile tileA
 				&& cc.Map.GetLayer("Buildings").Tiles[tilePosition.X, tilePosition.Y] is Tile tileB

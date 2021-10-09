@@ -2,15 +2,13 @@
 using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
 using StardewValley;
-using StardewValley.GameData;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace CustomCommunityCentre
 {
-	// TODO: ADD: Prefix all area and bundle names with the mod manifest unique ID when loaded
-
 	public class AssetManager : IAssetLoader, IAssetEditor
 	{
 		// Assets
@@ -21,27 +19,28 @@ namespace CustomCommunityCentre
 			Bundles.ModDataKeyDelim,
 			Bundles.ModDataValueDelim
 		};
+		public const string RequiredAssetNamePrefix = "Custom";
+		public const char RequiredAssetNameDivider = '_';
 
 		// Game content assets
-		public static readonly string RootGameContentPath = PathUtilities.NormalizeAssetName(
+		public static readonly string RootAssetKey = PathUtilities.NormalizeAssetName(
 			$@"Mods/{ModEntry.Instance.ModManifest.UniqueID}.Assets");
-		public static string GameBundleDefinitionsPath { get; private set; } = "BundleDefinitions";
-		public static string GameBundleSubstitutesPath { get; private set; } = "BundleSubstitutes";
-		public static string GameBundleMetadataPath { get; private set; } = "BundleMetadata";
-
-		// Local content assets
-		public static readonly string RootLocalContentPath = "assets";
-		public static string LocalBundleDefinitionsPath { get; private set; } = "bundleDefinitions";
-		public static string LocalBundleSubstitutesPath { get; private set; } = "bundleSubstitutes";
-		public static string LocalBundleMetadataPath { get; private set; } = "bundleMetadata";
+		public static string BundleMetadataAssetKey { get; private set; } = "BundleMetadata";
+		public static string BundleDefinitionsAssetKey { get; private set; } = "BundleDefinitions";
+		public static string BundleSubstitutesAssetKey { get; private set; } = "BundleSubstitutes";
 
 		// Internal sneaky asset business
-		internal static readonly string BundleDataAssetKey = System.IO.Path.Combine(RootGameContentPath, "BundleDataKey");
+		internal static string BundleDataAssetKey { get; private set; } = "BundleDataInternal";
+
+		// Asset dictionary keys
+		public const string BundleMetadataKey = "Metadata";
+		public const string BundleDefinitionsKey = "Definitions";
+		public const string BundleSubstitutesKey = "Substitutes";
 
 		// Asset lists
-		public readonly List<string> ModAssetKeys = new List<string>();
-		public readonly List<string> AssetsToEdit = new List<string>
-		{
+		public readonly List<string> ModAssetKeys = new();
+		public readonly List<string> GameAssetKeys = new()
+        {
 			@"Data/Events/Town",
 			@"Strings/BundleNames",
 			@"Strings/Locations",
@@ -51,62 +50,73 @@ namespace CustomCommunityCentre
 
 		public AssetManager()
 		{
-			IEnumerable<System.Reflection.PropertyInfo> properties = this
+			IEnumerable<PropertyInfo> properties = this
 				.GetType()
-				.GetProperties()
-				.Where(p => p.Name.EndsWith("Path"));
-			foreach (System.Reflection.PropertyInfo property in properties)
+				.GetProperties(bindingAttr: BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+				.Where(p => p.Name.EndsWith("AssetKey"))
+				.ToList();
+			foreach (PropertyInfo property in properties)
 			{
 				string path = System.IO.Path.Combine(
-						property.Name.StartsWith("Game")
-							? AssetManager.RootGameContentPath
-							: AssetManager.RootLocalContentPath,
-						property.GetValue(obj: this) as string);
+					AssetManager.RootAssetKey,
+					(string)property.GetValue(obj: this));
 				property.SetValue(
 					obj: this,
 					value: path);
-				if (property.Name.StartsWith("Game"))
-				{
-					path = property.GetValue(obj: this) as string;
-					this.ModAssetKeys.Add(path);
-				}
+				this.ModAssetKeys.Add(path);
 			}
-			this.AssetsToEdit.AddRange(this.ModAssetKeys);
 
-			Log.D($"Custom assets use root asset key:{Environment.NewLine}\"Target\": \"{AssetManager.RootGameContentPath}\"",
+			Log.D($"Custom assets use root asset key:{Environment.NewLine}\"{AssetManager.RootAssetKey}\"",
 				ModEntry.Config.DebugMode);
-			Log.D($"Custom assets keys:{Environment.NewLine}{string.Join(Environment.NewLine, this.ModAssetKeys.Select(s => $"\"{s}\""))}",
+			Log.D($"Custom asset keys:{Environment.NewLine}{string.Join(Environment.NewLine, this.ModAssetKeys.Take(this.ModAssetKeys.Count - 1).Select(s => $"\"Target\": \"{s}\""))}",
 				ModEntry.Config.DebugMode);
 		}
 
 		public bool CanLoad<T>(IAssetInfo asset)
 		{
-			return this.ModAssetKeys.Any(assetName => asset.AssetNameEquals(assetName))
-				|| asset.AssetNameEquals(CustomCommunityCentre.AssetManager.BundleDataAssetKey);
+			return this.ModAssetKeys.Any(assetName => asset.AssetNameEquals(assetName));
 		}
 
 		public T Load<T>(IAssetInfo asset)
 		{
 			// Load mod assets
 
-			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.GameBundleDefinitionsPath))
+			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.BundleMetadataAssetKey))
 			{
-				return (T)(object)new List<StardewValley.GameData.RandomBundleData>();
+				return (T)(object)new Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>>>
+				{
+					{
+						CustomCommunityCentre.AssetManager.BundleMetadataKey,
+						new Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>>()
+					}
+				};
 			}
-			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.GameBundleSubstitutesPath))
+			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.BundleDefinitionsAssetKey))
 			{
-				return (T)(object)new Dictionary<string, List<CustomCommunityCentre.Data.SubstituteBundleData>>();
+				return (T)(object)new Dictionary<string, Dictionary<string, List<StardewValley.GameData.RandomBundleData>>>
+				{
+					{
+						CustomCommunityCentre.AssetManager.BundleDefinitionsKey,
+						new Dictionary<string, List<StardewValley.GameData.RandomBundleData>>()
+					}
+				};
 			}
-			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.GameBundleMetadataPath))
+			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.BundleSubstitutesAssetKey))
 			{
-				return (T)(object)new List<CustomCommunityCentre.Data.BundleMetadata>();
+				return (T)(object)new Dictionary<string, Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.SubstituteBundleData>>>>
+				{
+					{ 
+						CustomCommunityCentre.AssetManager.BundleSubstitutesKey,
+						new Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.SubstituteBundleData>>>()
+					}
+				};
 			}
 
 			// Internal sneaky asset business
 
 			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.BundleDataAssetKey))
 			{
-				return (T)(object)BundleManager.Parse(data: Bundles.BundleData);
+				return (T)(object)BundleManager.Parse(bundleDefinitions: Bundles.BundleData);
 			}
 
 			return (T)(object)null;
@@ -114,8 +124,8 @@ namespace CustomCommunityCentre
 
 		public bool CanEdit<T>(IAssetInfo asset)
 		{
-			return this.AssetsToEdit.Any(assetName => asset.AssetNameEquals(assetName))
-				|| this.ModAssetKeys.Any(assetName => asset.AssetNameEquals(assetName));
+			return //this.ModAssetKeys.Any(assetName => asset.AssetNameEquals(assetName)) || 
+				this.GameAssetKeys.Any(assetName => asset.AssetNameEquals(assetName));
 		}
 
 		public void Edit<T>(IAssetData asset)
@@ -158,11 +168,11 @@ namespace CustomCommunityCentre
 				var data = asset.AsDictionary<string, string>().Data;
 
 				// Add bundle display names to localised bundle names dictionary
-				foreach (CustomCommunityCentre.Data.BundleMetadata bundleMetadata in Bundles.CustomBundleMetadata)
+				foreach (CustomCommunityCentre.Data.BundleMetadata bundleMetadata in Bundles.GetAllCustomBundleMetadataEntries())
 				{
 					foreach (string bundleName in bundleMetadata.BundleDisplayNames.Keys)
 					{
-						data[bundleMetadata.AreaName] = CustomCommunityCentre.Data.BundleMetadata.GetLocalisedString(
+						data[bundleName] = CustomCommunityCentre.Data.BundleMetadata.GetLocalisedString(
 							dict: bundleMetadata.BundleDisplayNames[bundleName],
 							defaultValue: bundleName);
 					}
@@ -177,7 +187,7 @@ namespace CustomCommunityCentre
 				var data = asset.AsDictionary<string, string>().Data;
 
 				// Add area display names and completion strings
-				foreach (CustomCommunityCentre.Data.BundleMetadata bundleMetadata in Bundles.CustomBundleMetadata)
+				foreach (CustomCommunityCentre.Data.BundleMetadata bundleMetadata in Bundles.GetAllCustomBundleMetadataEntries())
 				{
 					string areaNameAsAssetKey = Bundles.GetAreaNameAsAssetKey(bundleMetadata.AreaName);
 					data[$"CommunityCenter_AreaName_{areaNameAsAssetKey}"] = bundleMetadata.AreaDisplayName
@@ -198,7 +208,7 @@ namespace CustomCommunityCentre
 				var data = asset.AsDictionary<string, string>().Data;
 
 				// Add reward text
-				foreach (CustomCommunityCentre.Data.BundleMetadata bundleMetadata in Bundles.CustomBundleMetadata)
+				foreach (CustomCommunityCentre.Data.BundleMetadata bundleMetadata in Bundles.GetAllCustomBundleMetadataEntries())
 				{
 					int areaNumber = Bundles.GetCustomAreaNumberFromName(bundleMetadata.AreaName);
 					data[$"JunimoNote_Reward{areaNumber}"] = bundleMetadata.AreaCompleteDialogue
@@ -217,17 +227,19 @@ namespace CustomCommunityCentre
 			helper.Content.InvalidateCache(@"Strings/UI");
 
 			Bundles.CustomBundleMetadata = Game1.content.Load
-				<List<CustomCommunityCentre.Data.BundleMetadata>>
-				(AssetManager.GameBundleMetadataPath);
+				<Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>>>>
+				(CustomCommunityCentre.AssetManager.BundleMetadataAssetKey)
+				[CustomCommunityCentre.AssetManager.BundleMetadataKey];
 
 			Bundles.BundleData = Game1.content.Load
-				<List<RandomBundleData>>
-				(CustomCommunityCentre.AssetManager.GameBundleDefinitionsPath);
+				<Dictionary<string, Dictionary<string, List<StardewValley.GameData.RandomBundleData>>>>
+				(CustomCommunityCentre.AssetManager.BundleDefinitionsAssetKey)
+				[CustomCommunityCentre.AssetManager.BundleDefinitionsKey];
 		}
 
 		public static string PrefixAsset(string asset, string prefix = null)
 		{
-			return string.Join(".", prefix ?? AssetManager.AssetPrefix, asset);
+			return string.Join(".", prefix ?? CustomCommunityCentre.AssetManager.AssetPrefix, asset);
 		}
 	}
 }

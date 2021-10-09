@@ -13,30 +13,28 @@ using System.Linq;
 
 namespace CommunityCentreKitchen
 {
-	public class GusDeliveryService
+    public static class GusDeliveryService
 	{
 		private static IModHelper Helper => ModEntry.Instance.Helper;
 		private static IReflectionHelper Reflection => ModEntry.Instance.Helper.Reflection;
 
-		public static string DeliveryTextureAssetKey = CommunityCentreKitchen.AssetManager.GameDeliverySpritesPath;
-		public static Lazy<Texture2D> DeliveryTexture;
-
 		// Saloon delivery service
 		public const string ShopOwner = "Gus";
+		public const string ShopLocation = "Saloon";
 		public static readonly string ItemDeliveryModDataKey = $"{ModEntry.Instance.ModManifest.UniqueID}.ItemDelivery";
-		public static bool IsDeliveryInProgress;
 
+		public static Lazy<Texture2D> DeliveryTexture;
+		public static Lazy<Chest> ItemDeliveryChest;
 		public static int DeliveryStartTime;
 		public static int DeliveryEndTime;
+
 		public const int DeliveryTimeDelta = 1;
 		public const int SaloonOpeningTime = 1200;
 		public const int SaloonClosingTime = 2400;
 
-		public static bool IsSaloonDeliverySurchargeActive => !Bundles.IsCommunityCentreComplete(Bundles.CC);
+		public static string DeliveryTextureAssetKey = CommunityCentreKitchen.AssetManager.DeliverySpritesAssetKey;
+		public static bool IsSaloonDeliverySurchargeActive => !Bundles.IsCommunityCentreCompleteEarly(Bundles.CC);
 		public const int SaloonDeliverySurcharge = 50;
-
-		public static Vector2 DummyDeliveryChestTilePosition => new Vector2(CustomCommunityCentre.ModEntry.DummyId);
-		public const string DummyDeliveryChestLocation = "Farm";
 
 		// Mail data
 		public static string MailSaloonDeliverySurchargeWaived => $"{ModEntry.Instance.ModManifest.UniqueID}.saloonDeliverySurchargeWaived";
@@ -68,9 +66,21 @@ namespace CommunityCentreKitchen
 				});
 		}
 
+		internal static void SaveLoadedBehaviours()
+		{
+			// Reload lazy assets per save
+			GusDeliveryService.ResetDeliveryTexture();
+			GusDeliveryService.ResetDeliveryChest();
+		}
+
+		internal static void DayStartedBehaviours()
+		{
+			// . . .
+		}
+
 		private static void GameLoop_DayStarted(object sender, DayStartedEventArgs e)
 		{
-			if (Bundles.IsCommunityCentreComplete(Bundles.CC))
+			if (Bundles.IsCommunityCentreCompleteEarly(Bundles.CC))
 			{
 				// Add mail on Community Centre completion for Saloon delivery service surcharge fee waived
 				if (!Game1.player.hasOrWillReceiveMail(GusDeliveryService.MailSaloonDeliverySurchargeWaived))
@@ -82,21 +92,23 @@ namespace CommunityCentreKitchen
 
 		private static void GameLoop_TimeChanged(object sender, TimeChangedEventArgs e)
 		{
-			if (GusDeliveryService.IsDeliveryInProgress
+			if (GusDeliveryService.ItemDeliveryChest.IsValueCreated
+				&& GusDeliveryService.ItemDeliveryChest.Value.items.Any()
+				&& !(Game1.activeClickableMenu is CommunityCentreKitchen.ShopMenuNoInventory)
 				&& (e.NewTime < GusDeliveryService.SaloonOpeningTime
 					|| e.NewTime > GusDeliveryService.SaloonClosingTime
 					|| e.NewTime >= GusDeliveryService.DeliveryEndTime))
 			{
-				bool isGusHere = Game1.getFarm().critters.All(c => !(c is GusOnABike));
-				if (isGusHere)
+				if (!GusOnABike.IsGusOnFarm())
 				{
-					if (Game1.currentLocation.isFarmBuildingInterior())
-					{
-						GusOnABike.Honk(isOnFarm: false);
-					}
-					else if (Game1.currentLocation is Farm)
+					if (Game1.currentLocation is Farm)
 					{
 						GusOnABike.Create();
+					}
+					else
+					{
+						GusOnABike.Honk(isOnFarm: false);
+						GusDeliveryService.AddDeliveryChests();
 					}
 				}
 			}
@@ -141,18 +153,36 @@ namespace CommunityCentreKitchen
 				&& dialogueBox.characterDialogue?.speaker?.Name == GusDeliveryService.ShopOwner
 				&& (Kitchen.HasOrWillReceiveKitchenCompletedMail() || Kitchen.IsKitchenComplete(Bundles.CC)))
 			{
-				GusDeliveryService.TryOpenDeliveryMenu();
-
+				if ((e.OldMenu == null || !(e.OldMenu is CommunityCentreKitchen.ShopMenuNoInventory))
+					&& (GusOnABike.IsGusOnFarm() || GusOnABike.WhereGus() != GusDeliveryService.ShopLocation))
+				{
+					// Replace phonecall with dummy dialogue if Gus is already delivering food
+					Game1.activeClickableMenu = new DialogueBox(ModEntry.i18n.Get("dialogue.phone.invalid"));
+				}
+				else
+				{
+					// Add delivery menu option to phonecall
+					GusDeliveryService.TryOpenDeliveryMenu();
+				}
 				return;
 			}
 		}
 
-		public static void ResetTexture()
+		internal static void ResetDeliveryTexture()
 		{
 			GusDeliveryService.DeliveryTexture = new Lazy<Texture2D>(delegate
 			{
 				Texture2D texture = Game1.content.Load<Texture2D>(GusDeliveryService.DeliveryTextureAssetKey);
 				return texture;
+			});
+		}
+
+		internal static void ResetDeliveryChest()
+		{
+			GusDeliveryService.ItemDeliveryChest = new Lazy<Chest>(delegate
+			{
+				Chest chest = new (playerChest: true, tileLocation: new Vector2(CustomCommunityCentre.ModEntry.DummyId));
+				return chest;
 			});
 		}
 
@@ -165,7 +195,7 @@ namespace CommunityCentreKitchen
 				return;
 
 			// Add question responses after dialogue
-			List<Response> responses = new List<Response>
+			List<Response> responses = new()
 			{
 				new Response(
 					responseKey: $"{ModEntry.Instance.ModManifest.UniqueID}_Telephone_delivery",
@@ -237,7 +267,7 @@ namespace CommunityCentreKitchen
 					chest.items.Clear();
 					chest.clearNulls();
 
-					TemporaryAnimatedSprite sprite = new TemporaryAnimatedSprite(
+					TemporaryAnimatedSprite sprite = new (
 						textureName: @"LooseSprites/Giftbox",
 						sourceRect: new Rectangle(
 							0,
@@ -278,18 +308,12 @@ namespace CommunityCentreKitchen
 
 		internal static void OpenDeliveryMenu()
 		{
-			if (GusDeliveryService.DeliveryTexture == null)
-			{
-				// Set first-time lazy texture
-				GusDeliveryService.ResetTexture();
-			}
-
 			// Open a limited-stock saloon shop for the player
 			Dictionary<ISalable, int[]> itemPriceAndStock = Utility.getSaloonStock()
-				.Where(pair => pair.Key is Item i && (!(i is StardewValley.Object o) || !o.IsRecipe))
+				.Where(pair => pair.Key is Item i && (i is not StardewValley.Object o || !o.IsRecipe))
 				.ToDictionary(pair => pair.Key, pair => pair.Value);
 
-			ShopMenuNoInventory shopMenu = new ShopMenuNoInventory(
+			CommunityCentreKitchen.ShopMenuNoInventory shopMenu = new (
 				itemPriceAndStock: itemPriceAndStock,
 				currency: 0,
 				who: GusDeliveryService.ShopOwner,
@@ -301,16 +325,11 @@ namespace CommunityCentreKitchen
 						amount: amount);
 
 					// Vanish the item and add it to the dummy delivery chest
-					((ShopMenuNoInventory)Game1.activeClickableMenu).heldItem = null;
+					((CommunityCentreKitchen.ShopMenuNoInventory)Game1.activeClickableMenu).heldItem = null;
 					Item i = ((Item)item).getOne();
 					i.Stack = amount;
-					i.modData[GusDeliveryService.ItemDeliveryModDataKey] = farmer.UniqueMultiplayerID.ToString();
-					((ShopMenuNoInventory)Game1.activeClickableMenu).AddToOrderDisplay(item: i);
-					Chest dummyChest = GusDeliveryService.GetDummyDeliveryChest();
-					dummyChest.addItem(i);
-
-					// Raise flags for delivery
-					GusDeliveryService.IsDeliveryInProgress = true;
+					((CommunityCentreKitchen.ShopMenuNoInventory)Game1.activeClickableMenu).AddToOrderDisplay(item: i);
+					GusDeliveryService.ItemDeliveryChest.Value.addItem(i);
 
 					return false;
 				});
@@ -344,56 +363,32 @@ namespace CommunityCentreKitchen
 			Game1.activeClickableMenu = shopMenu;
 		}
 
-		internal static Chest GetDummyDeliveryChest()
-		{
-			GameLocation where = Game1.getLocationFromName(GusDeliveryService.DummyDeliveryChestLocation);
-			Vector2 tilePosition = GusDeliveryService.DummyDeliveryChestTilePosition;
-			if (!where.Objects.TryGetValue(tilePosition, out StardewValley.Object o))
-			{
-				Chest chest = new Chest(playerChest: true, tileLocation: tilePosition);
-				where.Objects.Add(tilePosition, chest);
-			}
-			return where.Objects[tilePosition] as Chest;
-		}
-
 		internal static void AddDeliveryChests()
 		{
 			Farm farm = Game1.getFarm();
 
-			Chest dummyChest = GusDeliveryService.GetDummyDeliveryChest();
-			Dictionary<Farmer, List<Item>> farmersAndItems = Game1.getAllFarmers().ToDictionary(
-				keySelector: farmer => farmer,
-				elementSelector: farmer => dummyChest.items
-					.Where(i => farmer.UniqueMultiplayerID == long.Parse(i.modData[GusDeliveryService.ItemDeliveryModDataKey]))
-					.ToList());
-			foreach (Farmer farmer in farmersAndItems.Keys.Where(f => farmersAndItems[f].Any()))
-			{
-				Vector2 mailboxPosition = Utility.PointToVector2(farmer.getMailboxPosition());
-				Vector2 chestPosition = CustomCommunityCentre.ModEntry.FindFirstPlaceableTileAroundPosition(
-					location: farm,
-					tilePosition: mailboxPosition,
-					o: new Chest(),
-					maxIterations: 100);
-				Chest deliveryChest = new Chest(coins: 0, items: farmersAndItems[farmer], location: chestPosition, giftbox: true);
-				deliveryChest.modData[GusDeliveryService.ItemDeliveryModDataKey] = farmer.UniqueMultiplayerID.ToString();
-				farm.Objects.Add(chestPosition, deliveryChest);
+			Vector2 mailboxPosition = Utility.PointToVector2(Game1.player.getMailboxPosition());
+			Vector2 chestPosition = CustomCommunityCentre.ModEntry.FindFirstPlaceableTileAroundPosition(
+				location: farm,
+				tilePosition: mailboxPosition,
+				o: new Chest(),
+				maxIterations: 100);
+			Chest deliveryChest = new (coins: 0, items: GusDeliveryService.ItemDeliveryChest.Value.items.ToList(), location: chestPosition, giftbox: true);
+			deliveryChest.modData[GusDeliveryService.ItemDeliveryModDataKey] = Game1.player.UniqueMultiplayerID.ToString();
+			farm.Objects.Add(chestPosition, deliveryChest);
 
-				Bundles.BroadcastPuffSprites(
-					multiplayer: null,
-					location: farm,
-					tilePosition: chestPosition);
-			}
+			Bundles.BroadcastPuffSprites(
+				multiplayer: null,
+				location: farm,
+				tilePosition: chestPosition);
 
 			GusDeliveryService.ResetDelivery();
 		}
 
 		internal static void ResetDelivery()
 		{
-			GusDeliveryService.IsDeliveryInProgress = false;
+			GusDeliveryService.ItemDeliveryChest.Value.items.Clear();
 			GusDeliveryService.DeliveryStartTime = GusDeliveryService.DeliveryEndTime = -1;
-
-			GameLocation where = Game1.getLocationFromName(GusDeliveryService.DummyDeliveryChestLocation);
-			where.Objects.Remove(GusDeliveryService.DummyDeliveryChestTilePosition);
 		}
 	}
 }

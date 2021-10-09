@@ -1,3 +1,9 @@
+✔	❌
+
+✔	Custom content appears on new game
+	✔	Data loaded
+	✔	Junimo notes appear
+
 ✔	Load custom data
 	✔	Add CC values
 	✔	Add NetWorldState values
@@ -25,68 +31,71 @@
 	✔	Preserved rewards
 	✔	Multiplayer synchronised progress
 
-	Complete area
-		Persistent area progress
-			Overnight
-			Unload area
-			Reinstall
-		Bundles complete
-			All bundles fields true
-		Multiplayer synchronised progress
-		Mail received
+✔	Complete area
+	✔	Persistent area progress
+		✔	Overnight
+		✔	Unload area
+		✔	Reinstall
+	✔	Bundles complete
+		✔	All bundles fields true
+	✔	Multiplayer synchronised progress
+		✔	Area complete night event sync
+	✔	Mail received
 		✔	ccArea
-			Area_completed_followup
-			Area_reward_guarantee
+		✔	Area_completed_followup
 
-	Complete base areas only
-		CC must not complete while custom metadata loaded
+✔	Complete base areas only
+	✔	CC must not complete while custom metadata loaded
 
-	Complete custom areas only
-		CC must not complete while custom metadata loaded
+✔	Complete custom areas only
+	✔	CC must not complete while custom metadata loaded
 
-	Complete all areas
-		CC must complete
+✔	Complete all areas
+	✔	CC must complete
 
-	Complete CC
-
-	Complete JMWH
+✔	Complete CC
 
 ✔	Load 1 custom area
 
-	Load 2 custom areas
+✔	Load 2 custom areas
 
 ✔	Change custom areas during play
 
-	Change custom areas between CC complete and AJM
+	Complete JMWH
 
 	Complete AJM
+		Complete AJM without load/save between CC and AJM
+		Complete AJM with load/save
+
+✔	Load save with AJM complete
+	✔	Custom areas not loaded
 
 ✔	Junimo Note Menu
 	✔	Open
 	✔	Mutex
 	✔	Navigate
-			Host
+		✔	Host
 			✔	1 area
 			✔	2 areas
-				4 areas
-			Peer
+			✔	4 areas
+		✔	Peer
 			✔	1 area
 			✔	2 areas
-				4 areas
+			✔	4 areas
 
-	Gus delivery
-		Singleplayer
-			1 item
-			4 items
-			Sound plays indoors
-		Multiplayer
-			1 item
-			4 items
-			Gus appears per player
-			Sounds played per player
-			Items per player
-			Multiple items per order
-			Order from indoors
-			Place new order while old order in transit
-			Place new order while old order leaving
-			Try take other player's box
+✔	Gus delivery
+	✔	Singleplayer
+		✔	1 item
+		✔	4 items
+		✔	Sound plays indoors
+	✔	Multiplayer
+		✔	1 item
+		✔	4 items
+		✔	Gus appears per player
+		✔	Sounds played per player
+		✔	Items per player
+		✔	Multiple items per order
+		✔	Order from indoors
+		✔	Place new order while old order in transit
+		✔	Place new order while old order leaving
+		✔	Try take other player's box

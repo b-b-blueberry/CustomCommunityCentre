@@ -37,15 +37,14 @@ namespace CommunityCentreKitchen
 			}
 		}
 
-		public Dictionary<Item, int> DeliveryItemsAndCounts = new Dictionary<Item, int>();
+		public Dictionary<Item, int> DeliveryItemsAndCounts = new();
 		public Rectangle TextureBoxArea;
 		public Rectangle PlatesArea;
 		public int PlatesToFit;
 		private ItemHoverInfo _itemHoverInfo;
 
-		private static readonly Point TextureBoxMargins = new Point(20, 12);
-		private static readonly Rectangle PlateSourceArea = new Rectangle(0, 48 + 8, 24, 24);
-		private static readonly Rectangle RugSourceArea = new Rectangle(24, 48 + 8, 86, 24);
+		private static readonly Point TextureBoxMargins = new(20, 12);
+		private static readonly Rectangle PlateSourceArea = new(0, 48 + 8, 24, 24);
 
 
 		public ShopMenuNoInventory(Dictionary<ISalable, int[]> itemPriceAndStock, int currency = 0, string who = null,
@@ -70,17 +69,17 @@ namespace CommunityCentreKitchen
 				this.yPositionOnScreen + this.height - 256 + 40,
 				this.inventory.width + 56,
 				this.height - 448 + 20);
-			this.PlatesToFit = ((TextureBoxArea.Width - ((TextureBoxMargins.X + IClickableMenu.spaceToClearSideBorder) * 2))
-				/ (PlateSourceArea.Width * Game1.pixelZoom));
-			Point platesAreaDimensions = new Point(
-				PlatesToFit * PlateSourceArea.Width * Game1.pixelZoom,
-				PlateSourceArea.Height * Game1.pixelZoom);
-			Vector2 platesAreaOffset = new Vector2(
-				IClickableMenu.spaceToClearSideBorder + TextureBoxMargins.X + 16,
-				16 + TextureBoxMargins.Y);
+			this.PlatesToFit = ((this.TextureBoxArea.Width - ((ShopMenuNoInventory.TextureBoxMargins.X + IClickableMenu.spaceToClearSideBorder) * 2))
+				/ (ShopMenuNoInventory.PlateSourceArea.Width * Game1.pixelZoom));
+			Point platesAreaDimensions = new (
+				this.PlatesToFit * ShopMenuNoInventory.PlateSourceArea.Width * Game1.pixelZoom,
+				ShopMenuNoInventory.PlateSourceArea.Height * Game1.pixelZoom);
+			Vector2 platesAreaOffset = new (
+				IClickableMenu.spaceToClearSideBorder + ShopMenuNoInventory.TextureBoxMargins.X + 16,
+				16 + ShopMenuNoInventory.TextureBoxMargins.Y);
 			this.PlatesArea = new Rectangle(
 				this.TextureBoxArea.X + (int)platesAreaOffset.X,
-				this.TextureBoxArea.Y + (int)platesAreaOffset.Y + Game1.dialogueFont.LineSpacing + TextureBoxMargins.Y * 2,
+				this.TextureBoxArea.Y + (int)platesAreaOffset.Y + Game1.dialogueFont.LineSpacing + ShopMenuNoInventory.TextureBoxMargins.Y * 2,
 				platesAreaDimensions.X,
 				platesAreaDimensions.Y);
 			this.inventory.yPositionOnScreen = 999999;
@@ -106,7 +105,7 @@ namespace CommunityCentreKitchen
 
 			Vector2 position = Utility.PointToVector2(this.TextureBoxArea.Location)
 				+ new Vector2(IClickableMenu.spaceToClearSideBorder, 16)
-				+ Utility.PointToVector2(TextureBoxMargins);
+				+ Utility.PointToVector2(ShopMenuNoInventory.TextureBoxMargins);
 
 			// Draw order title
 			{
@@ -124,22 +123,8 @@ namespace CommunityCentreKitchen
 			}
 
 			position = Utility.PointToVector2(this.PlatesArea.Location);
-			/*
-			Vector2 rugPosition = new Vector2(
-					this.PlatesArea.X + ((this.PlatesArea.Width - ShopMenuNoInventory.RugSourceArea.Width) / 2),
-					this.PlatesArea.Y);
-			b.Draw(
-				texture: GusDeliveryService.DeliveryTexture.Value,
-				position: rugPosition,
-				sourceRectangle: ShopMenuNoInventory.RugSourceArea,
-				color: Color.White,
-				rotation: 0f,
-				origin: Vector2.Zero,
-				scale: Game1.pixelZoom,
-				effects: SpriteEffects.None,
-				layerDepth: 1f);
-			*/
-			Point boxBiggening = new Point(16, 8);
+			
+			Point boxBiggening = new (16, 8);
 			Rectangle areaBox = this.PlatesArea;
 			areaBox.X -= boxBiggening.X;
 			areaBox.Y -= boxBiggening.Y;
@@ -157,10 +142,8 @@ namespace CommunityCentreKitchen
 				scale: Game1.pixelZoom,
 				drawShadow: false);
 
-			//b.Draw(texture: Game1.fadeToBlackRect, sourceRectangle: null, destinationRectangle: areaBox, color: Color.Red);
-
 			Vector2 itemOffsetFromPlate = new Vector2(StardewValley.Object.spriteSheetTileSize)
-				- new Vector2(PlateSourceArea.Width, PlateSourceArea.Height);
+				- new Vector2(ShopMenuNoInventory.PlateSourceArea.Width, ShopMenuNoInventory.PlateSourceArea.Height);
 			List<Item> items = this.DeliveryItemsAndCounts.Keys.ToList();
 			for (int i = 0; i < this.DeliveryItemsAndCounts.Count; ++i)
 			{
@@ -168,7 +151,7 @@ namespace CommunityCentreKitchen
 				b.Draw(
 					texture: GusDeliveryService.DeliveryTexture.Value,
 					position: position,
-					sourceRectangle: PlateSourceArea,
+					sourceRectangle: ShopMenuNoInventory.PlateSourceArea,
 					color: Color.White,
 					rotation: 0f,
 					origin: Vector2.Zero,
@@ -195,11 +178,11 @@ namespace CommunityCentreKitchen
 				{
 					const float tinyScale = 3f;
 					const int tinyHeight = 7;
-					Vector2 stackCountOffset = new Vector2(
-						x: (PlateSourceArea.Width * Game1.pixelZoom)
+					Vector2 stackCountOffset = new (
+						x: (ShopMenuNoInventory.PlateSourceArea.Width * Game1.pixelZoom)
 							- Utility.getWidthOfTinyDigitString(this.DeliveryItemsAndCounts[items[i]], tinyScale)
 							- (3 * tinyScale),
-						y: (PlateSourceArea.Height * Game1.pixelZoom)
+						y: (ShopMenuNoInventory.PlateSourceArea.Height * Game1.pixelZoom)
 							- (tinyHeight * tinyScale)
 							- (3 * tinyScale));
 					Utility.drawTinyDigits(
@@ -211,11 +194,11 @@ namespace CommunityCentreKitchen
 						c: Color.White);
 				}
 
-				position.X += PlateSourceArea.Width * Game1.pixelZoom;
+				position.X += ShopMenuNoInventory.PlateSourceArea.Width * Game1.pixelZoom;
 				if (i > 0 && i % this.PlatesToFit == 0)
 				{
-					position.Y += PlateSourceArea.Height * Game1.pixelZoom;
-					position.X = PlatesArea.X + (PlateSourceArea.Width * Game1.pixelZoom / 2);
+					position.Y += ShopMenuNoInventory.PlateSourceArea.Height * Game1.pixelZoom;
+					position.X = PlatesArea.X + (ShopMenuNoInventory.PlateSourceArea.Width * Game1.pixelZoom / 2);
 				}
 			}
 
@@ -248,7 +231,7 @@ namespace CommunityCentreKitchen
 					extraItemToShowIndex: extraItemIndex,
 					extraItemToShowAmount: extraItemAmount,
 					craftingIngredients: null,
-					moneyAmountToShowAtBottom: (hoverPrice > 0) ? hoverPrice : (-1));
+					moneyAmountToShowAtBottom: (this.hoverPrice > 0) ? this.hoverPrice : (-1));
 			}
 		}
 

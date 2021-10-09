@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 namespace CustomCommunityCentre
 {
-	public class ModEntry : Mod
+    public class ModEntry : Mod
 	{
 		public static ModEntry Instance;
 		internal static Config Config;
@@ -19,7 +19,7 @@ namespace CustomCommunityCentre
 		private const string CommandPrefix = "bb.ccc.";
 
 		// Player states
-		public readonly PerScreen<PlayerState> State = new PerScreen<PlayerState>(createNewState: () => new PlayerState());
+		public readonly PerScreen<PlayerState> State = new(createNewState: () => new PlayerState());
 		public class PlayerState
 		{
 			public int LastJunimoNoteMenuArea = 0;
@@ -57,6 +57,14 @@ namespace CustomCommunityCentre
 			{
 				this.Helper.ConsoleCommands.Add(ModEntry.CommandPrefix + "debug1", "...", (s, args) =>
 				{
+					Game1.player.eventsSeen.Add((int)Bundles.EventIds.CommunityCentreUnlocked);
+					Game1.addMail("JojaGreeting");
+					Game1.addMail("JojaMember");
+
+					Log.D($"{nameof(Game1.player.mailForTomorrow)}:{string.Join(System.Environment.NewLine, Game1.player.mailForTomorrow)}");
+					Log.D($"{nameof(Game1.player.mailbox)}:{string.Join(System.Environment.NewLine, Game1.player.mailbox)}");
+					Log.D($"{nameof(Game1.player.mailReceived)}:{string.Join(System.Environment.NewLine, Game1.player.mailReceived)}");
+					Log.D($"{nameof(Game1.player.eventsSeen)}:{string.Join(System.Environment.NewLine, Game1.player.eventsSeen)}");
 				});
 			}
 
@@ -124,9 +132,10 @@ namespace CustomCommunityCentre
 		{
 			// Recursive search logic taken from StardewValley.Utility.RecursiveFindOpenTiles()
 			int iterations = 0;
-			Queue<Vector2> positionsToCheck = new Queue<Vector2>();
+			Queue<Vector2> positionsToCheck = new();
 			positionsToCheck.Enqueue(tilePosition);
-			List<Vector2> closedList = new List<Vector2>();
+			List<Vector2> closedList = new();
+			Vector2[] directionsTileVectors = Utility.DirectionsTileVectors;
 			for (; iterations < maxIterations; ++iterations)
 			{
 				if (positionsToCheck.Count <= 0)
@@ -135,11 +144,12 @@ namespace CustomCommunityCentre
 				}
 				Vector2 currentPoint = positionsToCheck.Dequeue();
 				closedList.Add(currentPoint);
-				if (o.canBePlacedHere(location, currentPoint))
+				if (currentPoint != tilePosition
+					&& o.canBePlacedHere(location, currentPoint)
+					&& location.isTileLocationOpen(new xTile.Dimensions.Location((int)currentPoint.X, (int)currentPoint.Y)))
 				{
 					return currentPoint;
 				}
-				Vector2[] directionsTileVectors = Utility.DirectionsTileVectors;
 				foreach (Vector2 v in directionsTileVectors)
 				{
 					if (!closedList.Contains(currentPoint + v))

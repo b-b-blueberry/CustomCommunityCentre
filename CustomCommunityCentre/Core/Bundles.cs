@@ -4,7 +4,6 @@ using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Characters;
-using StardewValley.GameData;
 using StardewValley.Locations;
 using StardewValley.Menus;
 using System;
@@ -30,24 +29,24 @@ namespace CustomCommunityCentre
 		public static int CustomAreaInitialIndex;
 		public static int CustomBundleInitialIndex;
 
-		public static int DefaultAreaCount => Bundles.CC.areasComplete.Count();
-		public static int CustomAreaCount => Bundles.CustomAreasComplete.Count();
+		public static int DefaultAreaCount => Bundles.CC.areasComplete.Count;
+		public static int CustomAreaCount => Bundles.CustomAreasComplete.Count;
 		public static int TotalAreaCount => Bundles.DefaultAreaCount + Bundles.CustomAreaCount;
 		public static int TotalBundleCount => Bundles.CC.bundles.Count();
+		public static int DefaultAreasCompleteCount => Bundles.CC.areasComplete.Count(isComplete => isComplete);
+		public static int CustomAreasCompleteCount => Bundles.CustomAreasComplete.Values.Count(isComplete => isComplete);
+		public static int TotalAreasCompleteCount => Bundles.DefaultAreasCompleteCount + Bundles.CustomAreasCompleteCount;
 
-		public static Dictionary<string, int> CustomAreaNamesAndNumbers
-			= new Dictionary<string, int>();
-		public static Dictionary<string, string[]> CustomAreaBundleKeys
-			= new Dictionary<string, string[]>();
-		public static Dictionary<int, bool> CustomAreasComplete
-			= new Dictionary<int, bool>();
-		public static List<CustomCommunityCentre.Data.BundleMetadata> CustomBundleMetadata
-			= new List<CustomCommunityCentre.Data.BundleMetadata>();
-		public static List<StardewValley.GameData.RandomBundleData> BundleData
-			= new List<RandomBundleData>();
+		public static Dictionary<string, int> CustomAreaNamesAndNumbers = new();
+		public static Dictionary<string, string[]> CustomAreaBundleKeys = new();
+		public static Dictionary<int, bool> CustomAreasComplete = new();
+		public static Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>> CustomBundleMetadata = new();
+		public static List<Item> CustomBundleDonations = new();
 
-		public static readonly Point CustomBundleDonationsChestTile = new Point(32, 9);
-		public static readonly Vector2 CustomAreaStarPosition = new Vector2(2096f, 344f);
+		public static Dictionary<string, List<StardewValley.GameData.RandomBundleData>> BundleData = new();
+
+		public static readonly Point CustomBundleDonationsChestTile = new(32, 9);
+		public static readonly Vector2 CustomAreaStarPosition = new(2096f, 344f);
 
 		public const char BundleKeyDelim = '/';
 		public const char ModDataKeyDelim = '/';
@@ -127,7 +126,7 @@ namespace CustomCommunityCentre
 
 			Helper.ConsoleCommands.Add(cmd + "reset", "Reset all area-bundle progress to entirely incomplete.", (s, args) =>
 			{
-				if (Bundles.IsCommunityCentreComplete(Bundles.CC))
+				if (Bundles.IsCommunityCentreDefinitelyComplete(Bundles.CC))
 				{
 					Log.D("Too late.");
 					return;
@@ -169,7 +168,7 @@ namespace CustomCommunityCentre
 					Log.D("No bundle found.");
 					return;
 				}
-				if (Bundles.IsCommunityCentreComplete(Bundles.CC))
+				if (Bundles.IsCommunityCentreDefinitelyComplete(Bundles.CC))
 				{
 					Log.D("Too late.");
 					return;
@@ -189,7 +188,7 @@ namespace CustomCommunityCentre
 					Log.D("No area found.");
 					return;
 				}
-				if (Bundles.IsCommunityCentreComplete(Bundles.CC))
+				if (Bundles.IsCommunityCentreDefinitelyComplete(Bundles.CC))
 				{
 					Log.D("Too late.");
 					return;
@@ -214,8 +213,9 @@ namespace CustomCommunityCentre
 			Helper.ConsoleCommands.Add(cmd + "goto", $"Warp to a junimo note for an area in the CC.", (s, args) =>
 			{
 				int areaNumber = Bundles.GetAreaNumberFromCommandArgs(args);
+				string areaName = CommunityCenter.getAreaNameFromNumber(areaNumber);
 
-				if (areaNumber < 0 || areaNumber > Bundles.TotalAreaCount + 2)
+				if (string.IsNullOrWhiteSpace(areaName))
 				{
 					Log.D($"No valid area name or number found for '{string.Join(" ", args)}'.");
 					return;
@@ -323,7 +323,8 @@ namespace CustomCommunityCentre
 				return;
 
 			CommunityCenter cc = Bundles.CC;
-			if (e.OldMenu is JunimoNoteMenu junimoNoteMenu && e.NewMenu == null && !Bundles.IsCommunityCentreComplete(cc))
+			if (e.OldMenu is JunimoNoteMenu junimoNoteMenu && e.NewMenu == null
+				&& !Bundles.IsAbandonedJojaMartBundleAvailableOrComplete())
 			{
 				int areaNumber = Reflection.GetField
 					<int>
@@ -346,10 +347,16 @@ namespace CustomCommunityCentre
 		private static void Display_RenderedWorld(object sender, RenderedWorldEventArgs e)
 		{
 			// Draw final star on community centre areas complete plaque
-			if (!(Game1.currentLocation is CommunityCenter cc) || cc.numberOfStarsOnPlaque.Value <= Bundles.DefaultAreaCount)
+			int numberOfStars = Game1.currentLocation is CommunityCenter cc && cc != null
+				? cc.numberOfStarsOnPlaque.Value
+				: -1;
+			if (numberOfStars < Bundles.DefaultAreaCount)
 				return;
-
-			float alpha = Math.Max(0f, (Bundles.GetTotalAreasComplete(cc) / Bundles.TotalAreaCount));
+			// Star opacity is relative to the number of remaining areas complete outside of default star slots
+			// Custom and base areas are added to the default star slots, remaining areas count for opacity
+			int areasComplete = Bundles.TotalAreasCompleteCount - Bundles.DefaultAreaCount;
+			int areasCount = Bundles.TotalAreaCount - Bundles.DefaultAreaCount;
+			float alpha = Math.Max(0f, areasCount < 1 ? 1f : ((float)areasComplete / areasCount));
 			e.SpriteBatch.Draw(
 				texture: Game1.mouseCursors,
 				position: Game1.GlobalToLocal(viewport: Game1.viewport, globalPosition: Bundles.CustomAreaStarPosition),
@@ -382,7 +389,7 @@ namespace CustomCommunityCentre
 			{
 				// Navigate community centre bundles inventory menu
 				if (Game1.activeClickableMenu is JunimoNoteMenu menu && menu != null
-					&& !Bundles.IsCommunityCentreComplete(Bundles.CC)
+					&& !Bundles.IsAbandonedJojaMartBundleAvailableOrComplete()
 					&& Reflection.GetField
 						<int>
 						(menu, "whichArea")
@@ -407,13 +414,21 @@ namespace CustomCommunityCentre
 			// . . .
 		}
 
-		public static bool IsCommunityCentreComplete(CommunityCenter cc)
+		public static bool IsCommunityCentreCompleteEarly(CommunityCenter cc)
 		{
 			if (cc == null)
 				return false;
 
 			// Check pre-completion bundle mail
 			bool masterPlayerComplete = Game1.MasterPlayer.hasCompletedCommunityCenter();
+
+			return masterPlayerComplete || Bundles.IsCommunityCentreDefinitelyComplete(cc);
+		}
+
+		public static bool IsCommunityCentreDefinitelyComplete(CommunityCenter cc)
+		{
+			if (cc == null)
+				return false;
 
 			// Check completion cutscenes
 			bool cutsceneSeen = new int[]
@@ -433,7 +448,7 @@ namespace CustomCommunityCentre
 			}
 			.Any(id => Game1.MasterPlayer.hasOrWillReceiveMail(id));
 
-			return masterPlayerComplete || cutsceneSeen || mailReceived;
+			return cutsceneSeen && mailReceived;
 		}
 
 		public static bool IsAbandonedJojaMartBundleAvailableOrComplete()
@@ -463,15 +478,21 @@ namespace CustomCommunityCentre
 			bool customBundlesComplete = cc.bundles.Keys
 				.Where(key => key >= CustomBundleInitialIndex)
 				.All(key => cc.bundles[key].All(value => value));
-			bool ccIsComplete = Bundles.IsCommunityCentreComplete(cc);
+			bool ccIsComplete = Bundles.IsCommunityCentreCompleteEarly(cc);
 
 			return !customAreasLoaded || customAreasComplete || !customBundlesLoaded || customBundlesComplete || ccIsComplete;
+		}
+
+		public static IEnumerable<CustomCommunityCentre.Data.BundleMetadata> GetAllCustomBundleMetadataEntries()
+        {
+			return Bundles.CustomBundleMetadata.Values.SelectMany(bmd => bmd);
 		}
 
 		public static CustomCommunityCentre.Data.BundleMetadata GetCustomBundleMetadataFromAreaNumber(int areaNumber)
 		{
 			string areaName = Bundles.GetCustomAreaNameFromNumber(areaNumber);
-			return Bundles.CustomBundleMetadata.FirstOrDefault(bmd => bmd.AreaName == areaName);
+			return Bundles.GetAllCustomBundleMetadataEntries()
+				.FirstOrDefault(bmd => bmd.AreaName == areaName);
 		}
 
 		public static int GetCustomAreaNumberFromName(string areaName)
@@ -490,7 +511,9 @@ namespace CustomCommunityCentre
 
 		public static string GetAreaNameAsAssetKey(string areaName)
 		{
-			return string.Join(string.Empty, areaName.Split(' '));
+			return string.IsNullOrWhiteSpace(areaName)
+				? string.Empty
+				: string.Join(string.Empty, areaName.Split(' '));
 		}
 
 		public static IEnumerable<string> GetAllAreaNames()
@@ -535,9 +558,14 @@ namespace CustomCommunityCentre
 			return bundleNumber >= Bundles.CustomBundleInitialIndex;
 		}
 
+		public static bool IsCustomBundle(string bundleName)
+		{
+			return bundleName.StartsWith(CustomCommunityCentre.AssetManager.RequiredAssetNamePrefix, StringComparison.InvariantCulture);
+		}
+
 		public static bool IsAreaComplete(CommunityCenter cc, int areaNumber)
 		{
-			return Bundles.IsCommunityCentreComplete(cc)
+			return Bundles.IsCommunityCentreCompleteEarly(cc)
 				|| Bundles.IsDefaultAreaComplete(cc: cc, areaNumber: areaNumber)
 				|| (Bundles.IsCustomArea(areaNumber) && Bundles.IsCustomAreaComplete(areaNumber: areaNumber));
 		}
@@ -578,24 +606,19 @@ namespace CustomCommunityCentre
 			return Bundles.CustomAreasComplete.Values.Count(isComplete => isComplete);
 		}
 
-		public static int GetTotalAreasComplete(CommunityCenter cc)
-		{
-			return cc.areasComplete.Count(isComplete => isComplete) + Bundles.CustomAreasComplete.Values.Count(isComplete => isComplete);
-		}
-
 		public static bool HasOrWillReceiveAreaCompletedMailForAllCustomAreas()
 		{
-			return Bundles.CustomBundleMetadata
-				.Select(bm => bm.AreaName)
+			return Bundles.GetAllCustomBundleMetadataEntries()
 				.Distinct()
 				.All(areaName => Game1.MasterPlayer.hasOrWillReceiveMail(string.Format(Bundles.MailAreaCompleted, areaName)));
 		}
 
-		public static List<StardewValley.GameData.RandomBundleData> GetGeneratedBundles()
+		public static Dictionary<string, List<StardewValley.GameData.RandomBundleData>> GetGeneratedBundles()
 		{
 			return Game1.content.Load
-				<List<StardewValley.GameData.RandomBundleData>>
-				(AssetManager.GameBundleDefinitionsPath);
+				<Dictionary<string, Dictionary<string, List<StardewValley.GameData.RandomBundleData>>>>
+				(AssetManager.BundleDataAssetKey)
+				[AssetManager.BundleDefinitionsKey];
 		}
 
 		public static bool IsMultiplayer()
@@ -633,12 +656,22 @@ namespace CustomCommunityCentre
 				int quantity = int.Parse(itemData[++i]);
 				int quality = int.Parse(itemData[++i]);
 				if (index == -1)
+				{
 					Game1.player.addUnearnedMoney(quantity);
+				}
 				else
+				{
+					if (index < 0)
+                    {
+						// Get object from category, hopefully avoiding dud item definitions
+						index = Game1.objectInformation
+							.LastOrDefault(pair => int.TryParse(pair.Value.Split('/')[3].Split(' ').Last(), out int i) && index == i).Key;
+                    }
 					Game1.createItemDebris(
 						item: new StardewValley.Object(index, quantity, isRecipe: false, price: -1, quality: quality),
 						origin: Game1.player.Position,
 						direction: -1);
+				}
 			}
 			Log.D($"Giving items for {bundle.Key}: {bundle.Value.Split(Bundles.BundleKeyDelim).First()} Bundle.",
 				print);
@@ -710,7 +743,9 @@ namespace CustomCommunityCentre
 			bool isPrevious = menu.areaBackButton != null && menu.areaBackButton.visible && menu.areaBackButton.containsPoint(x, y);
 			bool isNext = menu.areaNextButton != null && menu.areaNextButton.visible && menu.areaNextButton.containsPoint(x, y);
 
-			if (!isPrevious && !isNext)
+			bool isSpecificBundlePage = Reflection.GetField<bool>(obj: menu, name: "specificBundlePage").GetValue();
+
+			if (!menu.isReadyToCloseMenuOrBundle() || !JunimoNoteMenu.canClick || isSpecificBundlePage || !(isPrevious || isNext))
 				return;
 
 			ModEntry.Instance.State.Value.LastJunimoNoteMenuArea = -1;
@@ -841,7 +876,8 @@ namespace CustomCommunityCentre
 				.AppendLine($"Bundle Max: {DefaultMaxBundle}, Count: {TotalBundleCount}")
 				.AppendLine($"Multiplayer: (G:{Game1.IsMultiplayer}-B:{Bundles.IsMultiplayer()}), Host game: ({Game1.IsMasterGame}), Host player: ({Context.IsMainPlayer})")
 				.AppendLine($"IsAbandonedJojaMartBundleAvailableOrComplete: {Bundles.IsAbandonedJojaMartBundleAvailableOrComplete()}")
-				.AppendLine($"IsCommunityCentreComplete: {Bundles.IsCommunityCentreComplete(cc)}")
+				.AppendLine($"IsCommunityCentreDefinitelyComplete: {Bundles.IsCommunityCentreDefinitelyComplete(cc)}")
+				.AppendLine($"IsCommunityCentreComplete: {Bundles.IsCommunityCentreCompleteEarly(cc)}")
 				.AppendLine($"AreAnyCustomAreasLoaded:  {Bundles.AreAnyCustomAreasLoaded()}")
 				.AppendLine($"AreaAllCustomAreasComplete:  {Bundles.AreaAllCustomAreasComplete(cc)}")
 				.AppendLine($"HasOrWillReceiveAreaCompletedMailForAllCustomAreas:  {Bundles.HasOrWillReceiveAreaCompletedMailForAllCustomAreas()}")
@@ -857,7 +893,7 @@ namespace CustomCommunityCentre
 				// Custom info
 				($"CCC: CCC {nameof(Bundles.CustomBundleMetadata)}[{Bundles.CustomBundleMetadata.Count}]:",
 				string.Join(Environment.NewLine,
-					Bundles.CustomBundleMetadata.Select(bmd => $"{bmd.AreaName}: {bmd.BundleDisplayNames.Keys}"))),
+					Bundles.GetAllCustomBundleMetadataEntries().Select(bmd => $"{bmd.AreaName}: {string.Join(", ", bmd.BundleDisplayNames.Keys.ToList().Select(key => key))}"))),
 				($"CCC: CCC {nameof(Bundles.CustomAreaNamesAndNumbers)}[{Bundles.CustomAreaNamesAndNumbers.Count}]:",
 				string.Join(Environment.NewLine,
 					Bundles.CustomAreaNamesAndNumbers.Select(pair => $"{pair.Key}: {pair.Value}"))),
@@ -894,7 +930,7 @@ namespace CustomCommunityCentre
 			foreach ((string title, string body) in messages)
 			{
 				Bundles.Monitor.Log(title, logHigh);
-				Bundles.Monitor.Log($"{Environment.NewLine}{body}", logLow);
+				Bundles.Monitor.Log($"{Environment.NewLine}{body}{Environment.NewLine}", logLow);
 			}
 		}
 
