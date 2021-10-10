@@ -362,11 +362,12 @@ namespace CustomCommunityCentre
 			var bundleDisplayNames = Game1.content.Load
 				<Dictionary<string, string>>
 				(@"Strings/BundleNames");
-            IDictionary<string, int> bundleNamesAndNumbers = Bundles.GetAllBundleNamesAndNumbers();
 			for (int i = 0; i < __instance.bundles.Count; ++i)
 			{
-				if (Bundles.IsCustomBundle(bundleNamesAndNumbers[__instance.bundles[i].name]))
+				if (Bundles.IsCustomBundle(Bundles.GetBundleNumberFromName(__instance.bundles[i].name)))
+				{
 					__instance.bundles[i].label = bundleDisplayNames[__instance.bundles[i].name];
+				}
 			}
 		}
 
@@ -698,29 +699,30 @@ namespace CustomCommunityCentre
 
 				__instance.missedRewardsChest.Value.items.Clear();
 
+				bool hasUnclaimedRewards = false;
 				List<Item> rewards = new();
 				foreach (KeyValuePair<int, List<int>> areaAndBundles in areaNumbersAndBundleNumbers)
 				{
+					int areaNumber = areaAndBundles.Key;
 					bool isRewardUnclaimed = areaAndBundles.Value.Any()
 						&& areaAndBundles.Value
 							.All(bundleNumber => __instance.bundleRewards.TryGetValue(bundleNumber, out bool isUnclaimed) && isUnclaimed);
-					if (!isRewardUnclaimed)
+					if (!isRewardUnclaimed || __instance.areasComplete.Count() <= areaNumber || !__instance.areasComplete[areaNumber])
 						continue;
 
+					hasUnclaimedRewards = true;
 					rewards.Clear();
-					JunimoNoteMenu.GetBundleRewards(areaAndBundles.Key, rewards);
+					JunimoNoteMenu.GetBundleRewards(areaNumber, rewards);
 					foreach (Item item in rewards)
 					{
 						__instance.missedRewardsChest.Value.addItem(item);
 					}
 				}
 
-				bool isRewardsListClear = Game1.netWorldState.Value.BundleRewards.Values.All(isUnclaimed => !isUnclaimed);
-				if ((!isRewardsListClear && !__instance.missedRewardsChestVisible.Value)
-					|| (isRewardsListClear && __instance.missedRewardsChestVisible.Value))
+				if ((hasUnclaimedRewards && !__instance.missedRewardsChestVisible.Value)
+					|| (!hasUnclaimedRewards && __instance.missedRewardsChestVisible.Value))
 				{
-					__instance.showMissedRewardsChestEvent.Fire(arg: !isRewardsListClear);
-					if (isRewardsListClear)
+					if (!hasUnclaimedRewards)
 					{
 						Vector2 missedRewardsChestTile = Reflection.GetField
 							<Vector2>
@@ -733,7 +735,8 @@ namespace CustomCommunityCentre
 							tilePosition: missedRewardsChestTile);
 					}
 				}
-				__instance.missedRewardsChestVisible.Value = !isRewardsListClear;
+				__instance.showMissedRewardsChestEvent.Fire(arg: hasUnclaimedRewards);
+				__instance.missedRewardsChestVisible.Value = hasUnclaimedRewards;
 				return false;
 			}
 			catch (Exception e)

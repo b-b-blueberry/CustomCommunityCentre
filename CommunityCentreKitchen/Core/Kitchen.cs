@@ -13,7 +13,6 @@ using xTile.Tiles;
 
 namespace CommunityCentreKitchen
 {
-	// TODO: Translations for bundleMetadata area reward strings
 	public static class Kitchen
 	{
 		private static IModHelper Helper => ModEntry.Instance.Helper;
@@ -111,7 +110,7 @@ namespace CommunityCentreKitchen
 
 			// Close Community Centre fridge door after use in the renovated kitchen
 			bool isOldMenuCraftingPage = e.OldMenu is ItemGrabMenu || e.OldMenu is CraftingPage
-					|| nameof(e.OldMenu).EndsWith("CraftingPage", StringComparison.InvariantCultureIgnoreCase);
+				|| nameof(e.OldMenu).EndsWith("CraftingPage", StringComparison.InvariantCultureIgnoreCase);
 			if (isOldMenuCraftingPage && e.NewMenu == null && Game1.currentLocation is CommunityCenter cc)
 			{
 				Kitchen.TrySetFridgeDoor(cc: cc, isOpening: false);

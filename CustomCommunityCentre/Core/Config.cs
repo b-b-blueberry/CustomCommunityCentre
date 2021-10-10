@@ -4,6 +4,6 @@ namespace CustomCommunityCentre
 {
 	public class Config
 	{
-		public bool DebugMode { get; set; } = true;
+		public bool DebugMode { get; set; } = false;
 	}
 }

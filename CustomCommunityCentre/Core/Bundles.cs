@@ -207,7 +207,11 @@ namespace CustomCommunityCentre
 				new List<int> { 611439 }
 					.ForEach(id => Game1.player.eventsSeen.Add(id));
 				Game1.player.increaseBackpackSize(24);
-				Bundles.GiveAreaItems(cc: Bundles.CC, whichArea: Bundles.CustomAreaInitialIndex, print: true);
+				int areaNumber = Bundles.GetAreaNumberFromCommandArgs(args);
+				if (areaNumber >= 0)
+				{
+					Bundles.GiveAreaItems(cc: Bundles.CC, whichArea: Bundles.CustomAreaInitialIndex, print: true);
+				}
 			});
 
 			Helper.ConsoleCommands.Add(cmd + "goto", $"Warp to a junimo note for an area in the CC.", (s, args) =>
@@ -527,18 +531,28 @@ namespace CustomCommunityCentre
 				.SelectMany(areaName => Bundles.GetBundleNumbersForArea(areaName));
 		}
 
-		public static IDictionary<string, int> GetAllBundleNamesAndNumbers()
+		public static string GetBundleNameFromNumber(int bundleNumber)
 		{
-			return Game1.netWorldState.Value.BundleData.ToDictionary(
-				keySelector: pair => pair.Value.Split(Bundles.BundleKeyDelim).First(),
-				elementSelector: pair => int.Parse(pair.Key.Split(Bundles.BundleKeyDelim).Last()));
+			return Game1.netWorldState.Value.BundleData.Keys
+				.FirstOrDefault(pair => int.Parse(pair.Split(Bundles.BundleKeyDelim).Last()) == bundleNumber)
+				.Split(Bundles.BundleKeyDelim)
+				.First();
 		}
 
-		public static Dictionary<string, int> GetBundleNamesAndNumbersFromBundleKeys(IEnumerable<string> bundleKeys)
+		public static int GetBundleNumberFromName(string bundleName)
 		{
-			return bundleKeys.ToDictionary(
-				keySelector: s => s.Split(Bundles.BundleKeyDelim).First(),
-				elementSelector: s => int.Parse(s.Split(Bundles.BundleKeyDelim).Last()));
+			return int.Parse(Game1.netWorldState.Value.BundleData
+				.FirstOrDefault(pair => pair.Value.Split(Bundles.BundleKeyDelim).First() == bundleName)
+				.Key
+				.Split(Bundles.BundleKeyDelim)
+				.Last());
+		}
+
+		public static IEnumerable<(string, int)> GetBundleNamesAndNumbersFromBundleKeys(IEnumerable<string> bundleKeys)
+		{
+			return bundleKeys.Select(s =>
+				(name: s.Split(Bundles.BundleKeyDelim).First(),
+				number: int.Parse(s.Split(Bundles.BundleKeyDelim).Last())));
 		}
 
 		public static Dictionary<int, int[]> GetAllCustomAreaNumbersAndBundleNumbers()

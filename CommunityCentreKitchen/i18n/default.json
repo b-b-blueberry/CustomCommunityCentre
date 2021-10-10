@@ -11,5 +11,5 @@
 	"response.phone.delivery": "Phone delivery menu",
 	"response.phone.delivery_surcharge": "Phone delivery menu (50g surcharge)",
 	"label.phone.delivery.title": "Your order:"
-	//"question.phone.gus.dailydish": "Dish of the day"
+	//"response.phone.dailydish": "Dish of the day"
 }

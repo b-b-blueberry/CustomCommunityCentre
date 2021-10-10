@@ -67,7 +67,12 @@ namespace CustomCommunityCentre
 		internal static void DayStartedBehaviours(CommunityCenter cc)
 		{
 			// Load in new community centre area-bundle data if ready
-			if (Bundles.IsCommunityCentreDefinitelyComplete(cc))
+			if (Bundles.IsAbandonedJojaMartBundleAvailableOrComplete())
+			{
+				Log.D("Community centre and abandoned joja-mart complete, doing nothing.",
+					ModEntry.Config.DebugMode);
+			}
+			else if (Bundles.IsCommunityCentreDefinitelyComplete(cc))
 			{
 				Log.D("Community centre complete, unloading any bundle data.",
 					ModEntry.Config.DebugMode);
@@ -142,6 +147,13 @@ namespace CustomCommunityCentre
 					bundle_data_path: CustomCommunityCentre.AssetManager.BundleDataAssetKey, // Internal sneaky asset business
 					rng: r);
 
+				// Add bundle data entries, ignoring existing values for mod compatibility
+				Dictionary<string, string> oldBundleData = Game1.netWorldState.Value.BundleData;
+				bundleData = oldBundleData
+					.Union(bundleData.Where(pair => !oldBundleData.ContainsKey(pair.Key)))
+					.ToDictionary(pair => pair.Key, pair => pair.Value);
+
+				// Reassign bundle data
 				Game1.netWorldState.Value.SetBundleData(bundleData);
 			}
 			else
@@ -398,12 +410,13 @@ namespace CustomCommunityCentre
 
 			Dictionary<string, string> bundleData = Game1.netWorldState.Value.GetUnlocalizedBundleData();
 			IEnumerable<string> areaNames = Bundles.CustomAreaBundleKeys.Keys;
-			IDictionary<string, int> bundleNamesAndNumbers = Bundles.GetBundleNamesAndNumbersFromBundleKeys(
+			IEnumerable<(string name, int number)> bundles = Bundles.GetBundleNamesAndNumbersFromBundleKeys(
 				Bundles.CustomAreaBundleKeys.Values
 					.SelectMany(s => s));
 
 			Dictionary<string, bool> areasCompleteData = null;
-			Dictionary<string, bool> bundleRewardsData = null;
+			IEnumerable<(string name, bool isComplete)> bundleRewardsData = null;
+			// lord forgive me for what i am about to do
 
 			// Host player loads preserved/persistent data from world:
 			if (Context.IsMainPlayer)
@@ -449,13 +462,15 @@ namespace CustomCommunityCentre
 							keySelector: s => s.Split(Bundles.ModDataValueDelim).First(),
 							elementSelector: s => bool.Parse(s.Split(Bundles.ModDataValueDelim).Last()));
 
-					bundleRewardsData = bundleNamesAndNumbers
-						.Where(nameAndNum => !savedBundleRewards.Keys.Any(key => key == nameAndNum.Key))
-						.ToDictionary(nameAndNum => nameAndNum.Key, name => false)
-						.Concat(savedBundleRewards.Where(pair => bundleNamesAndNumbers.Keys.Contains(pair.Key)))
-						.ToDictionary(pair => pair.Key, pair => pair.Value);
+					bundleRewardsData = bundles
+						.Where(bundle => !savedBundleRewards.Keys.Any(key => key == bundle.name))
+						.Select(bundle => (name: bundle.name, isComplete: false))
+						.Concat(savedBundleRewards.Where(pair => bundles.Any(bundle => bundle.name == pair.Key))
+							.Select(pair => (name: pair.Key, isComplete: pair.Value)));
 
-					IEnumerable<string> excludedBundles = savedBundleRewards.Select(pair => pair.Key).Except(bundleRewardsData.Keys);
+					IEnumerable<string> excludedBundles = savedBundleRewards
+						.Select(pair => pair.Key)
+						.Except(bundleRewardsData.Select(bundleReward => bundleReward.name));
 					if (excludedBundles.Any())
 					{
 						string s = string.Join(", ", excludedBundles);
@@ -541,7 +556,7 @@ namespace CustomCommunityCentre
 			}
 			if (bundleRewardsData == null || !bundleRewardsData.Any())
 			{
-				bundleRewardsData = bundleNamesAndNumbers.ToDictionary(nameAndNum => nameAndNum.Key, name => false);
+				bundleRewardsData = bundles.Select(bundle => (name: bundle.name, isComplete: false));
 			}
 
 			// Set CC state to include custom content:
@@ -560,10 +575,10 @@ namespace CustomCommunityCentre
 			cc.refreshBundlesIngredientsInfo();
 
 			// Set bundle rewards dictionary to reflect saved data
-			foreach (string bundleName in bundleRewardsData.Keys)
+			foreach ((string name, bool isComplete) in bundleRewardsData)
 			{
-				int bundleNumber = bundleNamesAndNumbers[bundleName];
-				cc.bundleRewards[bundleNumber] = bundleRewardsData[bundleName];
+				int bundleNumber = bundles.FirstOrDefault(b => b.name == name).number;
+				cc.bundleRewards[bundleNumber] = isComplete;
 			}
 
 			Log.D("Loaded bundle data.",
@@ -672,10 +687,21 @@ namespace CustomCommunityCentre
 					cc.NetFields.AddField(netMutex.NetFields);
 				}
 			}
-			for (int i = 0; i < areaNamesAndNumbers.Count + Bundles.CustomAreaInitialIndex - Bundles.DefaultMaxArea - 1; ++i)
+
+			int areaDefaultCount = Bundles.DefaultMaxArea + 1;
+			int areaTotalCount = Bundles.IsCommunityCentreDefinitelyComplete(cc)
+				? areaDefaultCount
+				: areaNamesAndNumbers.Count + (Bundles.CustomAreaInitialIndex - areaDefaultCount);
+			for (int i = 0; i < areaDefaultCount; ++i)
 			{
-				// Load blank bundle lists for areas,
-				// including blank areas between base and custom indexes
+				// Load bundle lists for default areas
+				areaBundleDict[i] = new();
+			}
+			for (int i = areaDefaultCount; i < areaTotalCount; ++i)
+			{
+				// Load bundle lists for blank and custom areas
+				// These area lists are loaded separately as loading blank bundle lists
+				// without custom areas will cause issues
 				areaBundleDict[i] = new();
 			}
 			foreach (string bundleKey in Game1.netWorldState.Value.BundleData.Keys)
