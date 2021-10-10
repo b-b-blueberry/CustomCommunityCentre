@@ -1,0 +1,164 @@
+{
+	"Format": "1.23.0",
+	"Changes": [
+		{
+			// Optional: Bundle sprites
+			"LogName": "[CCC] Lounge: Sprites",
+			"Action": "Load",
+			"Target": "Mods\\blueberry.CommunityCentreLounge.Assets\\BundleSprites",
+			"FromFile": "assets/sprites.png"
+		},
+		{
+			// Required: Bundle metadata
+			"LogName": "[CCC] Lounge: Metadata",
+			"Action": "EditData",
+			"Target": "Mods/blueberry.CustomCommunityCentre.Assets/BundleMetadata",
+			"Fields": {
+				"Metadata": {
+					"Custom_blueberry_Lounge": [
+						{
+							"AreaName": "Custom_blueberry_Lounge_Area0",
+							"BundlesRequired": 1,
+							"JunimoColourName": "SkyBlue",
+							"AreaBounds": {
+								"X": 35,
+								"Y": 13,
+								"Width": 8,
+								"Height": 9
+							},
+							"NoteTileLocation": {
+								"X": 38,
+								"Y": 19
+							},
+							"JunimoOffsetFromNoteTileLocation": {
+								"X": 1,
+								"Y": -1
+							},
+							"AreaCompleteCutscene": {
+								"CameraTileLocation": {
+									"X": 40,
+									"Y": 17
+								},
+								"Actors": [
+									{
+										"ColourName": "White",
+										"TileLocation": {
+											"X": 38,
+											"Y": 20
+										},
+										"SourceTexture": "LooseSprites/Cursors",
+										"SourceRectangle": {
+											"X": 558,
+											"Y": 1422,
+											"Width": 20,
+											"Height": 30
+										},
+										"AnimationFrames": 3,
+										"AnimationInterval": 300,
+										"Scale": 4.0,
+										"FloatHorizontally": false,
+										"FloatVertically": false,
+									}
+								],
+								"Duration": 8000,
+								"Music": "stardrop",
+								"Sound": "",
+								"SoundInterval": 999999,
+								"DrawEffects": false,
+								"LocationName": "CommunityCenter",
+							},
+							"AreaDisplayName": {
+								"en": "Lounge",
+							},
+							"AreaRewardMessage": {
+								"en": "Reward: Comfy couch",
+							},
+							"AreaCompleteDialogue": {
+								"en": "Wow... Now we have to bring the sofa back, too.",
+							},
+							"BundleDisplayNames": {
+								"Custom_blueberry_Lounge_Area0_Bundle0": {
+									"en": "Comfy",
+								},
+								"Custom_blueberry_Lounge_Area0_Bundle1": {
+									"en": "Lazy",
+								}
+							}
+						}
+					]
+				}
+			}
+		},
+		{
+			// Required: Bundle definitions
+			"LogName": "[CCC] Lounge: Definitions",
+			"Action": "EditData",
+			"Target": "Mods/blueberry.CustomCommunityCentre.Assets/BundleDefinitions",
+			"Fields": {
+				"Definitions": {
+					"Custom_blueberry_Lounge": [
+						{
+					        "AreaName": "Custom_blueberry_Lounge_Area0",
+					        "BundleSets": [
+					            {
+					                "Bundles": [
+					                ]
+					            }
+					        ],
+					        "Bundles": [
+					            {
+					                "Name": "Custom_blueberry_Lounge_Area0_Bundle0",
+					                "Index": 0,
+					                "Sprite": "Mods\\blueberry.CommunityCentreLounge.Assets\\BundleSprites:0",
+					                "Color": "Purple",
+					                "Items": "1 Pumpkin Pie",
+					                "Pick": -1,
+					                "RequiredItems": 1,
+					                "Reward": "1 Blue Couch"
+					            },
+					            {
+					                "Name": "Custom_blueberry_Lounge_Area0_Bundle1",
+					                "Index": 0,
+					                "Sprite": "Mods\\blueberry.CommunityCentreLounge.Assets\\BundleSprites:1",
+					                "Color": "Yellow",
+					                "Items": "1 Survival Burger",
+					                "Pick": -1,
+					                "RequiredItems": 1,
+					                "Reward": "1 Yellow Couch"
+					            }
+					        ]
+						}
+					]
+				}
+			}
+		},
+		{
+			// Optional: Bundle substitutes
+			"LogName": "[CCC] Lounge: Substitutes",
+			"Action": "EditData",
+			"Target": "Mods/blueberry.CustomCommunityCentre.Assets/BundleSubstitutes",
+			"Fields": {
+				"Substitutes": {
+					"Custom_blueberry_Lounge": {
+						"Platonymous.CustomMusic": [
+							{
+								"BundleName": "Custom_blueberry_Lounge_Area0_Bundle0",
+								"Items": "1 Vinegar",
+								"Pick": -1,
+								"RequiredItems": 1,
+								"Reward": "1 Green Couch"
+							},
+							{
+								"BundleName": "Custom_blueberry_Lounge_Area0_Bundle1",
+								"Items": "1 Oil",
+								"Pick": -1,
+								"RequiredItems": 1,
+								"Reward": "1 Red Couch"
+							}
+						],
+					}
+				}
+			}
+		}
+	]
+}
