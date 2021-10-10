@@ -2,9 +2,9 @@
     "Name": "Custom Community Centre",
     "Author": "blueberry",
     "Version": "1.0.0",
-    "Description": "Adds new area bundles to the Community Centre.",
+    "Description": "Modding tool - Adds new areas and bundles to the Community Centre.",
     "UniqueID": "blueberry.CustomCommunityCentre",
     "EntryDll": "CustomCommunityCentre.dll",
-    "MinimumApiVersion": "3.12.0",
-    "UpdateKeys": [ "Nexus:????" ]
+    "MinimumApiVersion": "3.13.0-beta.0.0.1",
+    "UpdateKeys": [ "Nexus:9850" ]
 }
