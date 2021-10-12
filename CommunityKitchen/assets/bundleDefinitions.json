@@ -14,7 +14,7 @@
                     {
                         "Name": "Custom_blueberry_Kitchen_Area0_Bundle0",
                         "Index": 0,
-                        "Sprite": "Mods\\blueberry.CommunityCentreKitchen.Assets\\BundleSprites:0",
+                        "Sprite": "Mods\\blueberry.CommunityKitchen.Assets\\BundleSprites:0",
                         "Color": "Purple",
                         "Items": "1 Rhubarb Pie, 1 Strange Bun, 1 Fruit Salad, 1 Chocolate Cake, 1 Maple Bar",
                         "Pick": -1,
@@ -24,7 +24,7 @@
                     {
                         "Name": "Custom_blueberry_Kitchen_Area0_Bundle1",
                         "Index": 1,
-                        "Sprite": "Mods\\blueberry.CommunityCentreKitchen.Assets\\BundleSprites:1",
+                        "Sprite": "Mods\\blueberry.CommunityKitchen.Assets\\BundleSprites:1",
                         "Color": "Yellow",
                         "Items": "1 Glazed Yams, 1 Survival Burger, 1 Blueberry Tart, 1 Pepper Poppers",
                         "Pick": -1,
@@ -34,7 +34,7 @@
                     {
                         "Name": "Custom_blueberry_Kitchen_Area0_Bundle2",
                         "Index": 2,
-                        "Sprite": "Mods\\blueberry.CommunityCentreKitchen.Assets\\BundleSprites:2",
+                        "Sprite": "Mods\\blueberry.CommunityKitchen.Assets\\BundleSprites:2",
                         "Color": "Teal",
                         "Items": "1 Hashbrowns, 1 Cheese Cauliflower, 1 Cookie, 1 Farmer's Lunch",
                         "Pick": -1,
@@ -44,7 +44,7 @@
                     {
                         "Name": "Custom_blueberry_Kitchen_Area0_Bundle3",
                         "Index": 0,
-                        "Sprite": "Mods\\blueberry.CommunityCentreKitchen.Assets\\BundleSprites:3",
+                        "Sprite": "Mods\\blueberry.CommunityKitchen.Assets\\BundleSprites:3",
                         "Color": "Orange",
                         "Items": "1 Fried Calamari, 1 Crab Cakes, 1 Trout Soup, 1 Crispy Bass, 1 Dish O' The Sea, 1 Fried Eel",
                         "Pick": -1,
@@ -54,7 +54,7 @@
                     {
                         "Name": "Custom_blueberry_Kitchen_Area0_Bundle4",
                         "Index": 1,
-                        "Sprite": "Mods\\blueberry.CommunityCentreKitchen.Assets\\BundleSprites:4",
+                        "Sprite": "Mods\\blueberry.CommunityKitchen.Assets\\BundleSprites:4",
                         "Color": "Blue",
                         "Items": "1 Radish Salad, 1 Salmon Dinner, 1 Fish Taco, 1 Coleslaw",
                         "Pick": -1,
@@ -64,7 +64,7 @@
                     {
                         "Name": "Custom_blueberry_Kitchen_Area0_Bundle5",
                         "Index": 2,
-                        "Sprite": "Mods\\blueberry.CommunityCentreKitchen.Assets\\BundleSprites:5",
+                        "Sprite": "Mods\\blueberry.CommunityKitchen.Assets\\BundleSprites:5",
                         "Color": "Green",
                         "Items": "3 Algae Soup, 1 Oil of Garlic, 5 Bug Steak",
                         "Pick": -1,

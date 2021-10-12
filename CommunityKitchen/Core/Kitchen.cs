@@ -182,7 +182,7 @@ namespace CommunityKitchen
 		public static Chest GetKitchenFridge(CommunityCenter cc)
 		{
             // Update fridge chest object if null
-            if (cc.Objects[Kitchen.FridgeChestPosition] is not Chest chest)
+            if (!cc.Objects.TryGetValue(Kitchen.FridgeChestPosition, out StardewValley.Object o) || o is not Chest chest)
             {
                 chest = new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
                 chest.fridge.Value = true;
