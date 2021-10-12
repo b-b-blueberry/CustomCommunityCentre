@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace CommunityCentreKitchen
+namespace CommunityKitchen
 {
     public class AssetManager : IAssetEditor, IAssetLoader
 	{
@@ -27,23 +27,23 @@ namespace CommunityCentreKitchen
 
 		public bool CanLoad<T>(IAssetInfo asset)
 		{
-			return asset.AssetNameEquals(CommunityCentreKitchen.AssetManager.BundleSpritesAssetKey)
-				|| asset.AssetNameEquals(CommunityCentreKitchen.AssetManager.DeliverySpritesAssetKey);
+			return asset.AssetNameEquals(CommunityKitchen.AssetManager.BundleSpritesAssetKey)
+				|| asset.AssetNameEquals(CommunityKitchen.AssetManager.DeliverySpritesAssetKey);
 		}
 
 		public T Load<T>(IAssetInfo asset)
 		{
-			if (asset.AssetNameEquals(CommunityCentreKitchen.AssetManager.BundleSpritesAssetKey))
+			if (asset.AssetNameEquals(CommunityKitchen.AssetManager.BundleSpritesAssetKey))
 			{
 				return (T)(object)ModEntry.Instance.Helper.Content.Load
 					<Texture2D>
-					($"{CommunityCentreKitchen.AssetManager.LocalBundleSpritesPath}.png");
+					($"{CommunityKitchen.AssetManager.LocalBundleSpritesPath}.png");
 			}
-			if (asset.AssetNameEquals(CommunityCentreKitchen.AssetManager.DeliverySpritesAssetKey))
+			if (asset.AssetNameEquals(CommunityKitchen.AssetManager.DeliverySpritesAssetKey))
 			{
 				return (T)(object)ModEntry.Instance.Helper.Content.Load
 					<Texture2D>
-					($"{CommunityCentreKitchen.AssetManager.LocalDeliverySpritesPath}.png");
+					($"{CommunityKitchen.AssetManager.LocalDeliverySpritesPath}.png");
 			}
 			return (T)(object)null;
 		}
@@ -69,7 +69,7 @@ namespace CommunityCentreKitchen
 				var data = asset.AsDictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>>>().Data;
 				var newData = ModEntry.Instance.Helper.Content.Load
 					<Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>>>>
-					($"{CommunityCentreKitchen.AssetManager.LocalBundleMetadataPath}.json");
+					($"{CommunityKitchen.AssetManager.LocalBundleMetadataPath}.json");
 
 				data[CustomCommunityCentre.AssetManager.BundleMetadataKey]
 					= data[CustomCommunityCentre.AssetManager.BundleMetadataKey]
@@ -84,7 +84,7 @@ namespace CommunityCentreKitchen
 				var data = asset.AsDictionary<string, Dictionary<string, List<StardewValley.GameData.RandomBundleData>>>().Data;
 				var newData = ModEntry.Instance.Helper.Content.Load
 					<Dictionary<string, Dictionary<string, List<StardewValley.GameData.RandomBundleData>>>>
-					($"{CommunityCentreKitchen.AssetManager.LocalBundleDefinitionsPath}.json");
+					($"{CommunityKitchen.AssetManager.LocalBundleDefinitionsPath}.json");
 
 				data[CustomCommunityCentre.AssetManager.BundleDefinitionsKey]
 					= data[CustomCommunityCentre.AssetManager.BundleDefinitionsKey]
@@ -99,7 +99,7 @@ namespace CommunityCentreKitchen
 				var data = asset.AsDictionary<string, Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.SubstituteBundleData>>>>().Data;
 				var newData = ModEntry.Instance.Helper.Content.Load
 					<Dictionary<string, Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.SubstituteBundleData>>>>>
-					($"{CommunityCentreKitchen.AssetManager.LocalBundleSubstitutesPath}.json");
+					($"{CommunityKitchen.AssetManager.LocalBundleSubstitutesPath}.json");
 
 				data[CustomCommunityCentre.AssetManager.BundleSubstitutesKey]
 					= data[CustomCommunityCentre.AssetManager.BundleSubstitutesKey]

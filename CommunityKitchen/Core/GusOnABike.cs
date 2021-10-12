@@ -5,7 +5,7 @@ using StardewValley.BellsAndWhistles;
 using System;
 using System.Linq;
 
-namespace CommunityCentreKitchen
+namespace CommunityKitchen
 {
 	public class GusOnABike : Critter
 	{

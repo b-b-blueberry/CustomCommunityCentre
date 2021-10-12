@@ -5,13 +5,14 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Locations;
 using StardewValley.Menus;
+using StardewValley.Network;
 using StardewValley.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using xTile.Tiles;
 
-namespace CommunityCentreKitchen
+namespace CommunityKitchen
 {
 	public static class Kitchen
 	{
@@ -38,15 +39,17 @@ namespace CommunityCentreKitchen
 		};
 		public static Vector2 FridgeTilePosition = Vector2.Zero;
 
+
 		internal static void RegisterEvents()
 		{
 			Helper.Events.Input.ButtonPressed += Kitchen.Input_ButtonPressed;
 			Helper.Events.Display.MenuChanged += Kitchen.Display_MenuChanged;
 
 			CustomCommunityCentre.Events.LoadedArea += Kitchen.OnLoadedArea;
+			CustomCommunityCentre.Events.ResetSharedState += Kitchen.OnResetSharedState;
 		}
 
-		internal static void AddConsoleCommands(string cmd)
+        internal static void AddConsoleCommands(string cmd)
 		{
 			// . . .
 		}
@@ -94,7 +97,7 @@ namespace CommunityCentreKitchen
 						if (tile.TileIndex == Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1])
 						{
 							// Open the fridge as a chest
-							Kitchen.TrySetFridgeDoor(cc: cc, isOpening: true, button: e.Button);
+							Kitchen.TrySetFridgeDoor(cc: cc, isOpening: true, isUsingChest: true, button: e.Button);
 
 							return;
 						}
@@ -113,7 +116,7 @@ namespace CommunityCentreKitchen
 				|| nameof(e.OldMenu).EndsWith("CraftingPage", StringComparison.InvariantCultureIgnoreCase);
 			if (isOldMenuCraftingPage && e.NewMenu == null && Game1.currentLocation is CommunityCenter cc)
 			{
-				Kitchen.TrySetFridgeDoor(cc: cc, isOpening: false);
+				Kitchen.TrySetFridgeDoor(cc: cc, isOpening: false, isUsingChest: false);
 
 				return;
 			}
@@ -121,11 +124,20 @@ namespace CommunityCentreKitchen
 
 		private static void OnLoadedArea(object sender, EventArgs e)
 		{
-			if (((CustomCommunityCentre.LoadedAreaEventArgs)e).AreaName != Kitchen.KitchenAreaName)
+			if (((CustomCommunityCentre.AreaLoadedEventArgs)e).AreaName != Kitchen.KitchenAreaName)
 				return;
 
-			CommunityCenter cc = ((CustomCommunityCentre.LoadedAreaEventArgs)e).CommunityCenter;
+			CommunityCenter cc = ((CustomCommunityCentre.AreaLoadedEventArgs)e).CommunityCentre;
 			Kitchen.SetUpKitchen(cc);
+		}
+
+		private static void OnResetSharedState(object sender, EventArgs e)
+		{
+			CommunityCenter cc = ((CustomCommunityCentre.ResetSharedStateEventArgs)e).CommunityCentre;
+			if (Kitchen.IsKitchenComplete(cc))
+			{
+				Kitchen.SetUpKitchen(cc);
+			}
 		}
 
 		public static bool IsKitchenLoaded(CommunityCenter cc)
@@ -159,35 +171,25 @@ namespace CommunityCentreKitchen
 			Helper.Content.InvalidateCache(@"Strings/Locations");
 			Helper.Content.InvalidateCache(@"Strings/UI");
 
-			// Fetch tile position for opening/closing fridge visually
+			// Set tiles used for opening/closing fridge
 			Kitchen.FridgeTilesToUse = Helper.ModRegistry.IsLoaded("FlashShifter.StardewValleyExpandedCP") ? "SVE" : "Vanilla";
 			Kitchen.FridgeTilePosition = Kitchen.GetKitchenFridgeTilePosition(cc);
 
-			// Add community centre kitchen fridge container to the map for later
-			if (!cc.Objects.ContainsKey(Kitchen.FridgeChestPosition))
-			{
-				Chest chest = new (playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
-				cc.Objects.Add(Kitchen.FridgeChestPosition, chest);
-			}
-			((Chest)cc.Objects[Kitchen.FridgeChestPosition]).fridge.Value = true;
+			// Update kitchen fridge chest
+			Kitchen.GetKitchenFridge(cc);
 		}
 
 		public static Chest GetKitchenFridge(CommunityCenter cc)
 		{
-			// Add fridge chest object if missing
-			if (!cc.Objects.ContainsKey(Kitchen.FridgeChestPosition))
-			{
-				cc.Objects[Kitchen.FridgeChestPosition] = new Chest(
-					playerChest: true,
-					tileLocation: Kitchen.FridgeChestPosition);
-			}
-			// Get fridge chest object if available
-			Chest fridge = (Kitchen.IsKitchenComplete(cc)
-				&& cc.Objects.TryGetValue(Kitchen.FridgeChestPosition, out StardewValley.Object o)
-				&& o is Chest chest && chest != null)
-				? chest
-				: null;
+            // Update fridge chest object if null
+            if (cc.Objects[Kitchen.FridgeChestPosition] is not Chest chest)
+            {
+                chest = new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
+                chest.fridge.Value = true;
+                cc.Objects[Kitchen.FridgeChestPosition] = chest;
+            }
 
+			Chest fridge = Kitchen.IsKitchenComplete(cc) ? chest : null;
 			return fridge;
 		}
 
@@ -217,39 +219,79 @@ namespace CommunityCentreKitchen
 		private static void TryOpenCookingMenu(CommunityCenter cc, SButton button)
 		{
 			Helper.Input.Suppress(button);
-			Netcode.NetRef<Chest> netChest = new()
-            {
-				Value = (Chest)cc.Objects[Kitchen.FridgeChestPosition]
-			};
-			cc.ActivateKitchen(fridge: netChest);
+			
+			Kitchen.TryOpenCookingMenu(cc: cc, fridge: Kitchen.GetKitchenFridge(cc));
 		}
 
-		private static bool TrySetFridgeDoor(CommunityCenter cc, bool isOpening, SButton? button = null)
+		private static bool TrySetFridgeDoor(CommunityCenter cc, bool isOpening, bool isUsingChest, SButton? button = null)
 		{
 			if (button != null)
 			{
 				Helper.Input.Suppress(button.Value);
 			}
+
 			Point tilePosition = Utility.Vector2ToPoint(Kitchen.FridgeTilePosition);
-			if (Kitchen.IsKitchenComplete(cc)
-				&& Kitchen.FridgeTilePosition != Vector2.Zero
-				&& cc.Map.GetLayer("Front").Tiles[tilePosition.X, tilePosition.Y - 1] is Tile tileA
-				&& cc.Map.GetLayer("Buildings").Tiles[tilePosition.X, tilePosition.Y] is Tile tileB
-				&& tileA != null && tileB != null)
+            (xTile.Dimensions.Location tileA, xTile.Dimensions.Location tileB) = (
+				new (tilePosition.X, tilePosition.Y - 1),
+				new (tilePosition.X, tilePosition.Y));
+			if (Kitchen.IsKitchenComplete(cc) && Kitchen.FridgeTilePosition != Vector2.Zero)
 			{
-				if (!isOpening || ((Chest)cc.Objects[Kitchen.FridgeChestPosition]).checkForAction(Game1.player))
-				{
-					tileA.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][0];
-					tileB.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][1];
-				}
-				else
-				{
-					tileA.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][2];
-					tileB.TileIndex = Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][3];
-				}
+				// Set fridge tiles to default if fridge door is closing or if fridge chest is not in use
+				// Set fridge tiles to alternate (open) if fridge door is open or fridge chest is in use
+				int fridgeTiles = !isOpening
+					|| (isUsingChest && !((Chest)cc.Objects[Kitchen.FridgeChestPosition]).checkForAction(Game1.player))
+					? 0
+					: 2;
+				cc.Map.GetLayer("Front").Tiles[tileA].TileIndex
+					= Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][fridgeTiles];
+				cc.Map.GetLayer("Buildings").Tiles[tileB].TileIndex
+					= Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][fridgeTiles + 1];
 				return true;
 			}
 			return false;
+		}
+
+		// Taken from StardewValley.Locations.FarmHouse.cs:ActivateKitchen(NetRef<Chest> fridge)
+		// Edited to remove netref, mini-fridge and multiple-mutex references
+		public static void TryOpenCookingMenu(CommunityCenter cc, Chest fridge)
+		{
+			if (fridge != null && fridge.mutex.IsLocked())
+			{
+				Game1.showRedMessage(Game1.content.LoadString("Strings\\UI:Kitchen_InUse"));
+				return;
+			}
+			fridge?.mutex.RequestLock(
+				acquired: delegate
+				{
+					// Set fridge door visuals
+					Kitchen.TrySetFridgeDoor(cc: cc, isOpening: true, isUsingChest: false);
+
+					// Set new crafting page
+					Point dimensions = new (
+						x: 800 + IClickableMenu.borderWidth * 2,
+						y: 600 + IClickableMenu.borderWidth * 2);
+					Point position = Utility.Vector2ToPoint(Utility.getTopLeftPositionForCenteringOnScreen(
+						width: dimensions.X,
+						height: dimensions.Y));
+					Game1.activeClickableMenu = new CraftingPage(
+						x: position.X,
+						y: position.Y,
+						width: dimensions.X,
+						height: dimensions.Y,
+						cooking: true,
+						standalone_menu: true,
+						material_containers: new List<Chest> { fridge })
+					{
+						exitFunction = delegate
+						{
+							fridge.mutex.ReleaseLock();
+						}
+					};
+				},
+				failed: delegate
+				{
+					Game1.showRedMessage(Game1.content.LoadString("Strings\\UI:Kitchen_InUse"));
+				});
 		}
 	}
 }

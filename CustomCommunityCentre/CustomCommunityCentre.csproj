@@ -9,12 +9,7 @@
 		<Platforms>AnyCPU</Platforms>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<EnableHarmony>true</EnableHarmony>
-		<GamePath>C:\SteamSSD\steamapps\common\Stardew Valley</GamePath>
 	</PropertyGroup>
-
-	<ItemGroup>
-	  <None Include="..\.editorconfig" Link=".editorconfig" />
-	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.0.0-beta.20210916" />

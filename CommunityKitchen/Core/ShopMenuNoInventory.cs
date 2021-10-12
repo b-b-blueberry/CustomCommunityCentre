@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CommunityCentreKitchen
+namespace CommunityKitchen
 {
 	public class ShopMenuNoInventory : StardewValley.Menus.ShopMenu
 	{

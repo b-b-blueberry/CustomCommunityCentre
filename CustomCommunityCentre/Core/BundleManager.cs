@@ -689,7 +689,7 @@ namespace CustomCommunityCentre
 			}
 
 			int areaDefaultCount = Bundles.DefaultMaxArea + 1;
-			int areaTotalCount = Bundles.IsCommunityCentreDefinitelyComplete(cc)
+			int areaTotalCount = Bundles.IsCommunityCentreDefinitelyComplete(cc) || !Bundles.AreAnyCustomAreasLoaded()
 				? areaDefaultCount
 				: areaNamesAndNumbers.Count + (Bundles.CustomAreaInitialIndex - areaDefaultCount);
 			for (int i = 0; i < areaDefaultCount; ++i)

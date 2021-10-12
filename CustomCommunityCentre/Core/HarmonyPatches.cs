@@ -308,7 +308,7 @@ namespace CustomCommunityCentre
 			}
 
 			string areaName = CommunityCenter.getAreaNameFromNumber(area);
-			Events.InvokeOnLoadedArea(communityCenter: __instance, areaName: areaName, areaNumber: area);
+			Events.InvokeOnAreaLoaded(communityCentre: __instance, areaName: areaName, areaNumber: area);
 		}
 
 		public static void JunimoNoteMenu_ctor_Postfix(
@@ -428,6 +428,8 @@ namespace CustomCommunityCentre
 					}
 				}
 			}
+
+			CustomCommunityCentre.Events.InvokeOnResetSharedState(communityCentre: __instance);
 		}
 
 		public static void HasCompletedCommunityCenter_Postfix(

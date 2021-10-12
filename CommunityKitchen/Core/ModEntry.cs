@@ -1,7 +1,7 @@
 ﻿using StardewModdingAPI;
 using StardewModdingAPI.Events;
 
-namespace CommunityCentreKitchen
+namespace CommunityKitchen
 {
     public class ModEntry : Mod
 	{

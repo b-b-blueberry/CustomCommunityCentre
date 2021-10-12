@@ -11,7 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CommunityCentreKitchen
+namespace CommunityKitchen
 {
     public static class GusDeliveryService
 	{
@@ -32,7 +32,7 @@ namespace CommunityCentreKitchen
 		public const int SaloonOpeningTime = 1200;
 		public const int SaloonClosingTime = 2400;
 
-		public static string DeliveryTextureAssetKey = CommunityCentreKitchen.AssetManager.DeliverySpritesAssetKey;
+		public static string DeliveryTextureAssetKey = CommunityKitchen.AssetManager.DeliverySpritesAssetKey;
 		public static bool IsSaloonDeliverySurchargeActive => !Bundles.IsCommunityCentreCompleteEarly(Bundles.CC);
 		public const int SaloonDeliverySurcharge = 50;
 
@@ -94,7 +94,7 @@ namespace CommunityCentreKitchen
 		{
 			if (GusDeliveryService.ItemDeliveryChest.IsValueCreated
 				&& GusDeliveryService.ItemDeliveryChest.Value.items.Any()
-				&& !(Game1.activeClickableMenu is CommunityCentreKitchen.ShopMenuNoInventory)
+				&& !(Game1.activeClickableMenu is CommunityKitchen.ShopMenuNoInventory)
 				&& (e.NewTime < GusDeliveryService.SaloonOpeningTime
 					|| e.NewTime > GusDeliveryService.SaloonClosingTime
 					|| e.NewTime >= GusDeliveryService.DeliveryEndTime))
@@ -153,7 +153,7 @@ namespace CommunityCentreKitchen
 				&& dialogueBox.characterDialogue?.speaker?.Name == GusDeliveryService.ShopOwner
 				&& (Kitchen.HasOrWillReceiveKitchenCompletedMail() || Kitchen.IsKitchenComplete(Bundles.CC)))
 			{
-				if ((e.OldMenu == null || !(e.OldMenu is CommunityCentreKitchen.ShopMenuNoInventory))
+				if ((e.OldMenu == null || !(e.OldMenu is CommunityKitchen.ShopMenuNoInventory))
 					&& (GusOnABike.IsGusOnFarm() || GusOnABike.WhereGus() != GusDeliveryService.ShopLocation))
 				{
 					// Replace phonecall with dummy dialogue if Gus is already delivering food
@@ -313,7 +313,7 @@ namespace CommunityCentreKitchen
 				.Where(pair => pair.Key is Item i && (i is not StardewValley.Object o || !o.IsRecipe))
 				.ToDictionary(pair => pair.Key, pair => pair.Value);
 
-			CommunityCentreKitchen.ShopMenuNoInventory shopMenu = new (
+			CommunityKitchen.ShopMenuNoInventory shopMenu = new (
 				itemPriceAndStock: itemPriceAndStock,
 				currency: 0,
 				who: GusDeliveryService.ShopOwner,
@@ -325,10 +325,10 @@ namespace CommunityCentreKitchen
 						amount: amount);
 
 					// Vanish the item and add it to the dummy delivery chest
-					((CommunityCentreKitchen.ShopMenuNoInventory)Game1.activeClickableMenu).heldItem = null;
+					((CommunityKitchen.ShopMenuNoInventory)Game1.activeClickableMenu).heldItem = null;
 					Item i = ((Item)item).getOne();
 					i.Stack = amount;
-					((CommunityCentreKitchen.ShopMenuNoInventory)Game1.activeClickableMenu).AddToOrderDisplay(item: i);
+					((CommunityKitchen.ShopMenuNoInventory)Game1.activeClickableMenu).AddToOrderDisplay(item: i);
 					GusDeliveryService.ItemDeliveryChest.Value.addItem(i);
 
 					return false;

@@ -152,6 +152,11 @@ namespace CustomCommunityCentre
 				Game1.randomizeDebrisWeatherPositions(Game1.debrisWeather);
 			}
 			Game1.randomizeRainPositions();
+
+			CustomCommunityCentre.Events.InvokeOnAreaCompleteCutsceneStarted(
+				areaName: bundleMetadata.AreaName,
+				areaNumber: this.WhichEvent.Value);
+
 			return false;
 		}
 
