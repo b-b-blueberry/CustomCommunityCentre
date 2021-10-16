@@ -52,7 +52,7 @@ namespace CustomCommunityCentre
 
 		internal static void InvokeOnResetSharedState(CommunityCenter communityCentre)
 		{
-			ResetSharedState.Invoke(
+			ResetSharedState?.Invoke(
 				sender: null,
 				e: new ResetSharedStateEventArgs(
 					communityCentre: communityCentre));
@@ -60,7 +60,7 @@ namespace CustomCommunityCentre
 
 		internal static void InvokeOnAreaLoaded(CommunityCenter communityCentre, string areaName, int areaNumber)
 		{
-			LoadedArea.Invoke(
+			LoadedArea?.Invoke(
 				sender: null,
 				e: new AreaLoadedEventArgs(
 					communityCentre: communityCentre,
@@ -70,7 +70,7 @@ namespace CustomCommunityCentre
 
 		internal static void InvokeOnAreaCompleteCutsceneStarted(string areaName, int areaNumber)
 		{
-			AreaCompleteCutsceneStarted.Invoke(
+			AreaCompleteCutsceneStarted?.Invoke(
 				sender: null,
 				e: new AreaCompleteCutsceneStartedEventArgs(
 					areaName: areaName,

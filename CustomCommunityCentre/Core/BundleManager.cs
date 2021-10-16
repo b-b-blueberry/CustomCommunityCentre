@@ -158,8 +158,6 @@ namespace CustomCommunityCentre
 			}
 			else
 			{
-				Game1.GenerateBundles(Game1.bundleType);
-
 				if (Context.IsMainPlayer && Bundles.CustomAreaBundleKeys != null)
 				{
 					var netBundleData = Reflection.GetField
@@ -408,7 +406,6 @@ namespace CustomCommunityCentre
 
 			BundleManager.Generate(isLoadingCustomContent: true);
 
-			Dictionary<string, string> bundleData = Game1.netWorldState.Value.GetUnlocalizedBundleData();
 			IEnumerable<string> areaNames = Bundles.CustomAreaBundleKeys.Keys;
 			IEnumerable<(string name, int number)> bundles = Bundles.GetBundleNamesAndNumbersFromBundleKeys(
 				Bundles.CustomAreaBundleKeys.Values
@@ -520,8 +517,7 @@ namespace CustomCommunityCentre
 								{
 									ingredientsComplete[ingredientIndex] = true;
 									chest.items.Remove(item);
-									// Do not add to CustomBundleDonations here.
-									// It only handles new item donations to add to the chest.
+									Bundles.CustomBundleDonations.Add(item);
 									break;
 								}
 							}
@@ -605,6 +601,7 @@ namespace CustomCommunityCentre
 					{
 						if (cc.Objects.ContainsKey(tileLocation))
 						{
+							// Replace any existing object with this chest
 							if (o != null)
 							{
 								chest.items.Add(cc.Objects[tileLocation]);
@@ -612,6 +609,7 @@ namespace CustomCommunityCentre
 						}
 						foreach (Item item in Bundles.CustomBundleDonations.ToList())
 						{
+							// Add all bundle donations to the chest
 							chest.items.Add(item);
 							Bundles.CustomBundleDonations.Remove(item);
 						}

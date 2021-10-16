@@ -204,7 +204,7 @@ namespace CustomCommunityCentre
 			{
 				new List<string> { "ccDoorUnlock", "seenJunimoNote", "wizardJunimoNote", "canReadJunimoText" }
 					.ForEach(id => Game1.player.mailReceived.Add(id));
-				new List<int> { 611439 }
+				new List<int> { (int)Bundles.EventIds.CommunityCentreUnlocked }
 					.ForEach(id => Game1.player.eventsSeen.Add(id));
 				Game1.player.increaseBackpackSize(24);
 				int areaNumber = Bundles.GetAreaNumberFromCommandArgs(args);
@@ -212,12 +212,25 @@ namespace CustomCommunityCentre
 				{
 					Bundles.GiveAreaItems(cc: Bundles.CC, whichArea: Bundles.CustomAreaInitialIndex, print: true);
 				}
+
+				Log.D("CC set up.");
+			});
+
+			Helper.ConsoleCommands.Add(cmd + "joja", $"Prepare the Joja warehouse.", (s, args) =>
+			{
+				new List<string> { "ccDoorUnlock", "JojaGreeting", "JojaMember" }
+					.ForEach(id => Game1.player.mailReceived.Add(id));
+				new List<int> { (int)Bundles.EventIds.CommunityCentreUnlocked }
+					.ForEach(id => Game1.player.eventsSeen.Add(id));
+
+				Log.D("Joja set up.");
 			});
 
 			Helper.ConsoleCommands.Add(cmd + "goto", $"Warp to a junimo note for an area in the CC.", (s, args) =>
 			{
 				int areaNumber = Bundles.GetAreaNumberFromCommandArgs(args);
 				string areaName = CommunityCenter.getAreaNameFromNumber(areaNumber);
+				string locationName = nameof(CommunityCenter);
 
 				if (string.IsNullOrWhiteSpace(areaName))
 				{
@@ -232,7 +245,7 @@ namespace CustomCommunityCentre
 				Log.D($"Warping to area {areaNumber} - {CommunityCenter.getAreaNameFromNumber(areaNumber)} ({tileLocation.ToString()})");
 
 				Game1.warpFarmer(
-					locationName: Bundles.CC.Name,
+					locationName: locationName,
 					tileX: tileLocation.X,
 					tileY: tileLocation.Y + 1,
 					facingDirectionAfterWarp: 2);
@@ -292,11 +305,25 @@ namespace CustomCommunityCentre
 			// Send followup mail when an area is completed
 			foreach (KeyValuePair<string, int> areaNameAndNumber in Bundles.CustomAreaNamesAndNumbers)
 			{
-				string mailId = string.Format(Bundles.MailAreaCompletedFollowup, areaNameAndNumber.Key);
-				if (Bundles.IsAreaComplete(cc, areaNumber: areaNameAndNumber.Value)
-					&& !Game1.MasterPlayer.hasOrWillReceiveMail(mailId))
+				string mailId;
+				if (Bundles.IsAreaComplete(cc, areaNumber: areaNameAndNumber.Value))
 				{
-					Game1.addMailForTomorrow(mailId);
+					// Completion mail
+					mailId = string.Format(Bundles.MailAreaCompleted, areaNameAndNumber.Key);
+					if (!Game1.player.hasOrWillReceiveMail(mailId))
+					{
+						Log.D($"Sending day-started mail for custom bundle completion ({mailId})",
+							ModEntry.Config.DebugMode);
+						Game1.player.mailReceived.Add(mailId + "%&NL&%");
+					}
+					// Followup mail
+					mailId = string.Format(Bundles.MailAreaCompletedFollowup, areaNameAndNumber.Key);
+					if (!Game1.player.hasOrWillReceiveMail(mailId))
+					{
+						Log.D($"Sending followup mail for custom bundle completion ({mailId})",
+							ModEntry.Config.DebugMode);
+						Game1.addMailForTomorrow(mailId);
+					}
 				}
 			}
 		}
@@ -424,9 +451,10 @@ namespace CustomCommunityCentre
 				return false;
 
 			// Check pre-completion bundle mail
-			bool masterPlayerComplete = Game1.MasterPlayer.hasCompletedCommunityCenter();
+			bool isProbablyComplete = Game1.MasterPlayer.hasCompletedCommunityCenter();
+			bool isDefinitelyComplete = Bundles.IsCommunityCentreDefinitelyComplete(cc);
 
-			return masterPlayerComplete || Bundles.IsCommunityCentreDefinitelyComplete(cc);
+			return isProbablyComplete || isDefinitelyComplete;
 		}
 
 		public static bool IsCommunityCentreDefinitelyComplete(CommunityCenter cc)
@@ -608,9 +636,10 @@ namespace CustomCommunityCentre
 			bool isAreaComplete = Bundles.CustomAreasComplete.TryGetValue(areaNumber, out bool isComplete) && isComplete;
 
 			// Custom area is also considered complete if it has no bundles loaded
-			List<int> bundleNumbers = Bundles.GetBundleNumbersForArea(Bundles.GetCustomAreaNameFromNumber(areaNumber));
-			bool isBundleSetComplete = !bundleNumbers.Any()
-				|| bundleNumbers.All(bundleNumber => Game1.netWorldState.Value.Bundles[bundleNumber].All(b => b));
+			string areaName = Bundles.GetCustomAreaNameFromNumber(areaNumber);
+			List<int> bundleNumbers = Bundles.GetBundleNumbersForArea(areaName);
+			bool isBundleSetComplete = bundleNumbers.Any()
+				&& bundleNumbers.All(bundleNumber => Game1.netWorldState.Value.Bundles[bundleNumber].All(b => b));
 
 			return isAreaComplete || isBundleSetComplete;
 		}
@@ -625,14 +654,6 @@ namespace CustomCommunityCentre
 			return Bundles.GetAllCustomBundleMetadataEntries()
 				.Distinct()
 				.All(areaName => Game1.MasterPlayer.hasOrWillReceiveMail(string.Format(Bundles.MailAreaCompleted, areaName)));
-		}
-
-		public static Dictionary<string, List<StardewValley.GameData.RandomBundleData>> GetGeneratedBundles()
-		{
-			return Game1.content.Load
-				<Dictionary<string, Dictionary<string, List<StardewValley.GameData.RandomBundleData>>>>
-				(AssetManager.BundleDataAssetKey)
-				[AssetManager.BundleDefinitionsKey];
 		}
 
 		public static bool IsMultiplayer()
@@ -886,8 +907,9 @@ namespace CustomCommunityCentre
 			LogLevel logLow = Config.DebugMode ? LogLevel.Info : LogLevel.Trace;
 
 			System.Text.StringBuilder msg = new System.Text.StringBuilder()
-				.AppendLine($"Area Max: {DefaultMaxArea}, Count: {TotalAreaCount}")
-				.AppendLine($"Bundle Max: {DefaultMaxBundle}, Count: {TotalBundleCount}")
+				.AppendLine($"Bundle Type: {Game1.bundleType.ToString()}")
+				.AppendLine($"Area DefaultMax: {DefaultMaxArea}, Count: {TotalAreaCount}")
+				.AppendLine($"Bundle DefaultMax: {DefaultMaxBundle}, Count: {TotalBundleCount}")
 				.AppendLine($"Multiplayer: (G:{Game1.IsMultiplayer}-B:{Bundles.IsMultiplayer()}), Host game: ({Game1.IsMasterGame}), Host player: ({Context.IsMainPlayer})")
 				.AppendLine($"IsAbandonedJojaMartBundleAvailableOrComplete: {Bundles.IsAbandonedJojaMartBundleAvailableOrComplete()}")
 				.AppendLine($"IsCommunityCentreDefinitelyComplete: {Bundles.IsCommunityCentreDefinitelyComplete(cc)}")

@@ -593,8 +593,7 @@ namespace CustomCommunityCentre
 					(__instance, "areaToBundleDictionary")
 					.GetValue();
 
-				if (!Context.IsMainPlayer
-					&& Bundles.DefaultMaxArea > 0
+				if (Bundles.DefaultMaxArea > 0
 					&& (areaBundleDict == null || areaBundleDict.Count == Bundles.DefaultMaxArea + 1))
 				{
 					BundleManager.ReplaceAreaBundleConversions(cc: __instance);
@@ -613,6 +612,10 @@ namespace CustomCommunityCentre
 			int whichArea)
 		{
 			string areaName = CommunityCenter.getAreaNameFromNumber(whichArea);
+
+			if (!Bundles.IsCustomArea(whichArea) || string.IsNullOrWhiteSpace(areaName))
+				return;
+
 			string mail = string.Format(Bundles.MailAreaCompleted, Bundles.GetAreaNameAsAssetKey(areaName));
 			if (Bundles.IsCustomAreaComplete(areaNumber: whichArea) && !Game1.player.hasOrWillReceiveMail(mail))
 			{
@@ -842,7 +845,7 @@ namespace CustomCommunityCentre
 					CustomCommunityCentre.Data.BundleMetadata bundleMetadata
 						= Bundles.GetCustomBundleMetadataFromAreaNumber(areaNameAndNumber.Value);
 					if (bundleMetadata?.AreaCompleteCutscene != null
-						&& (Game1.player.mailForTomorrow.Contains(mailId) || Game1.player.mailForTomorrow.Contains($"{mailId}%&NL&%")))
+						&& (Game1.MasterPlayer.mailForTomorrow.Contains(mailId) || Game1.player.mailForTomorrow.Contains($"{mailId}%&NL&%")))
 					{
 						int whichEvent = areaNameAndNumber.Value;
 						__result = new CustomCommunityCentre.AreaCompleteNightEvent(whichEvent);

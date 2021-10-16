@@ -57,14 +57,32 @@ namespace CustomCommunityCentre
 			{
 				this.Helper.ConsoleCommands.Add(ModEntry.CommandPrefix + "debug1", "...", (s, args) =>
 				{
-					Game1.player.eventsSeen.Add((int)Bundles.EventIds.CommunityCentreUnlocked);
-					Game1.addMail("JojaGreeting");
-					Game1.addMail("JojaMember");
-
+					
 					Log.D($"{nameof(Game1.player.mailForTomorrow)}:{string.Join(System.Environment.NewLine, Game1.player.mailForTomorrow)}");
 					Log.D($"{nameof(Game1.player.mailbox)}:{string.Join(System.Environment.NewLine, Game1.player.mailbox)}");
 					Log.D($"{nameof(Game1.player.mailReceived)}:{string.Join(System.Environment.NewLine, Game1.player.mailReceived)}");
 					Log.D($"{nameof(Game1.player.eventsSeen)}:{string.Join(System.Environment.NewLine, Game1.player.eventsSeen)}");
+					
+					/*
+					var tempCC = new CommunityCenter();
+					var CompletedItems = tempCC.bundlesDict();
+					*/
+					/*
+					if (args.Length < 2)
+					{
+						Log.D("Missing args: <dialogueKey> <dialogueCharaName> [dialogueSheetName]");
+						return;
+					}
+					string dialogueKey = args[0];
+					string dialogueCharaName = args[1];
+					NPC dialogueChara = Utility.fuzzyCharacterSearch(dialogueCharaName);
+					string dialogueSheetName = args.Length > 2 ? args[2] : $"Characters\\Dialogue\\{dialogueChara.Name}";
+					string dialogueKeyComplete = $"{dialogueSheetName}:{dialogueKey}";
+					string dialogueString = Game1.content.LoadString(dialogueKeyComplete);
+					Dialogue dialogue = new Dialogue(dialogueString, dialogueChara);
+					Game1.activeClickableMenu = new StardewValley.Menus.DialogueBox(dialogue);
+					Monitor.Log($"{dialogueKeyComplete} : {dialogueString}", LogLevel.Debug);
+					*/
 				});
 			}
 
