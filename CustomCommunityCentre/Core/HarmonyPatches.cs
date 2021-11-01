@@ -34,7 +34,7 @@ namespace CustomCommunityCentre
 			}
 		}
 
-		private static IReflectionHelper Reflection => ModEntry.Instance.Helper.Reflection;
+		private static IReflectionHelper Reflection => CustomCommunityCentre.ModEntry.Instance.Helper.Reflection;
 
 		private const string ConstructorName = ".ctor";
 		private const char PatchDelimiter = '_';
@@ -196,7 +196,7 @@ namespace CustomCommunityCentre
 			foreach (Patch patch in Patches)
 			{
 				Log.D($"Applying Harmony patch {patch.TargetType}{PatchDelimiter}{patch.PatchMethod}",
-					ModEntry.Config.DebugMode);
+					CustomCommunityCentre.ModEntry.Config.DebugMode);
 
 				// Generate patch method
 				string harmonyTypeName = patch.PatchMethod.Split(PatchDelimiter).Last();
@@ -308,7 +308,7 @@ namespace CustomCommunityCentre
 			}
 
 			string areaName = CommunityCenter.getAreaNameFromNumber(area);
-			Events.InvokeOnAreaLoaded(communityCentre: __instance, areaName: areaName, areaNumber: area);
+			CustomCommunityCentre.Events.Game.InvokeOnAreaLoaded(communityCentre: __instance, areaName: areaName, areaNumber: area);
 		}
 
 		public static void JunimoNoteMenu_ctor_Postfix(
@@ -410,12 +410,7 @@ namespace CustomCommunityCentre
 				}
 				foreach (int areaNumber in Bundles.CustomAreasComplete.Keys)
 				{
-					bool shouldNoteAppearInArea = false;
-					HarmonyPatches.ShouldNoteAppearInArea_Postfix(
-						__instance: __instance,
-						__result: ref shouldNoteAppearInArea,
-						area: areaNumber);
-					if (shouldNoteAppearInArea)
+					if (Bundles.ShouldNoteAppearInCustomArea(cc: __instance, areaNumber: areaNumber))
 					{
 						string areaName = Bundles.GetCustomAreaNameFromNumber(areaNumber);
 						CustomCommunityCentre.Data.BundleMetadata bundleMetadata = Bundles.GetAllCustomBundleMetadataEntries()
@@ -429,7 +424,7 @@ namespace CustomCommunityCentre
 				}
 			}
 
-			CustomCommunityCentre.Events.InvokeOnResetSharedState(communityCentre: __instance);
+			CustomCommunityCentre.Events.Game.InvokeOnResetSharedState(communityCentre: __instance);
 		}
 
 		public static void HasCompletedCommunityCenter_Postfix(
@@ -572,15 +567,10 @@ namespace CustomCommunityCentre
 			ref bool __result,
 			int area)
 		{
-			CustomCommunityCentre.Data.BundleMetadata bundleMetadata = Bundles.GetCustomBundleMetadataFromAreaNumber(area);
-
-			if (Bundles.IsAbandonedJojaMartBundleAvailableOrComplete() || bundleMetadata == null)
+			if (Bundles.IsAbandonedJojaMartBundleAvailableOrComplete() || !Bundles.IsCustomArea(area) || !Bundles.AreAnyCustomAreasLoaded())
 				return;
 
-			bool isAreaComplete = Bundles.IsAreaComplete(cc: __instance, areaNumber: area);
-			int bundlesRequired = bundleMetadata.BundlesRequired;
-			int bundlesCompleted = __instance.numberOfCompleteBundles();
-			__result = bundlesCompleted >= bundlesRequired && !isAreaComplete;
+			__result = Bundles.ShouldNoteAppearInCustomArea(cc: __instance, areaNumber: area);
 		}
 
 		public static bool InitAreaBundleConversions_Prefix(
@@ -621,7 +611,7 @@ namespace CustomCommunityCentre
 			{
 				// Add some mail flag to this bundle to indicate completion
 				Log.D($"Sending mail for custom bundle completion ({mail})",
-					ModEntry.Config.DebugMode);
+					CustomCommunityCentre.ModEntry.Config.DebugMode);
 				Game1.addMailForTomorrow(mail, noLetter: true);
 			}
 		}
@@ -678,7 +668,7 @@ namespace CustomCommunityCentre
 			{
 				foreach (int areaNumber in Bundles.CustomAreasComplete.Keys)
 				{
-					bool isAvailable = __instance.shouldNoteAppearInArea(area: areaNumber);
+					bool isAvailable = Bundles.ShouldNoteAppearInCustomArea(cc: __instance, areaNumber: areaNumber);
 					bool isComplete = Bundles.IsCustomAreaComplete(areaNumber);
 					if (isAvailable)
 					{
@@ -775,7 +765,7 @@ namespace CustomCommunityCentre
 					&& tile != null && tile.TileIndex != 0;
 
 				bool isNoteAtArea = __instance.isJunimoNoteAtArea(areaNumber);
-				bool isNoteReady = __instance.shouldNoteAppearInArea(areaNumber);
+				bool isNoteReady = Bundles.ShouldNoteAppearInCustomArea(cc: __instance, areaNumber: areaNumber);
 
 				if (!(isNoteAtArea && isNoteSuperAtAreaAreYouSure) && isNoteReady)
 				{

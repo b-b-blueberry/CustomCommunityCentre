@@ -40,10 +40,7 @@ namespace CustomCommunityCentre
 		public static Dictionary<string, int> CustomAreaNamesAndNumbers = new();
 		public static Dictionary<string, string[]> CustomAreaBundleKeys = new();
 		public static Dictionary<int, bool> CustomAreasComplete = new();
-		public static Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>> CustomBundleMetadata = new();
 		public static List<Item> CustomBundleDonations = new();
-
-		public static Dictionary<string, List<StardewValley.GameData.RandomBundleData>> BundleData = new();
 
 		public static readonly Point CustomBundleDonationsChestTile = new(32, 9);
 		public static readonly Vector2 CustomAreaStarPosition = new(2096f, 344f);
@@ -517,7 +514,7 @@ namespace CustomCommunityCentre
 
 		public static IEnumerable<CustomCommunityCentre.Data.BundleMetadata> GetAllCustomBundleMetadataEntries()
         {
-			return Bundles.CustomBundleMetadata.Values.SelectMany(bmd => bmd);
+			return ModEntry.ContentPacks.SelectMany(cp => cp.Metadata.Values);
 		}
 
 		public static CustomCommunityCentre.Data.BundleMetadata GetCustomBundleMetadataFromAreaNumber(int areaNumber)
@@ -642,6 +639,15 @@ namespace CustomCommunityCentre
 				&& bundleNumbers.All(bundleNumber => Game1.netWorldState.Value.Bundles[bundleNumber].All(b => b));
 
 			return isAreaComplete || isBundleSetComplete;
+		}
+
+		public static bool ShouldNoteAppearInCustomArea(CommunityCenter cc, int areaNumber)
+		{
+			CustomCommunityCentre.Data.BundleMetadata bundleMetadata = Bundles.GetCustomBundleMetadataFromAreaNumber(areaNumber);
+			bool isAreaComplete = Bundles.IsAreaComplete(cc: cc, areaNumber: areaNumber);
+			int bundlesRequired = bundleMetadata.BundlesRequired;
+			int bundlesCompleted = cc.numberOfCompleteBundles();
+			return bundlesCompleted >= bundlesRequired && !isAreaComplete;
 		}
 
 		public static int GetNumberOfCustomAreasComplete()
@@ -818,7 +824,7 @@ namespace CustomCommunityCentre
 
 		public static void BroadcastPuffSprites(Multiplayer multiplayer, GameLocation location, Vector2 tilePosition)
 		{
-			TemporaryAnimatedSprite sprite = new TemporaryAnimatedSprite(
+			TemporaryAnimatedSprite sprite = new (
 				rowInAnimationTexture: (Game1.random.NextDouble() < 0.5) ? 5 : 46,
 				position: (tilePosition * Game1.tileSize) + new Vector2(0, Game1.smallestTileSize),
 				color: Color.White)
@@ -832,8 +838,8 @@ namespace CustomCommunityCentre
 		internal static void SetUpJunimosForGoodbyeDance(CommunityCenter cc)
 		{
 			List<Junimo> junimos = cc.getCharacters().OfType<Junimo>().ToList();
-			Vector2 min = new Vector2(junimos.Min(j => j.Position.X), junimos.Min(j => j.Position.Y));
-			Vector2 max = new Vector2(junimos.Max(j => j.Position.X), junimos.Max(j => j.Position.Y));
+			Vector2 min = new (junimos.Min(j => j.Position.X), junimos.Min(j => j.Position.Y));
+			Vector2 max = new (junimos.Max(j => j.Position.X), junimos.Max(j => j.Position.Y));
 			for (int i = 0; i < Bundles.CustomAreaNamesAndNumbers.Count; ++i)
 			{
 				Junimo junimo = cc.getJunimoForArea(Bundles.CustomAreaInitialIndex + i);
@@ -927,9 +933,6 @@ namespace CustomCommunityCentre
 				msg.ToString()),
 
 				// Custom info
-				($"CCC: CCC {nameof(Bundles.CustomBundleMetadata)}[{Bundles.CustomBundleMetadata.Count}]:",
-				string.Join(Environment.NewLine,
-					Bundles.GetAllCustomBundleMetadataEntries().Select(bmd => $"{bmd.AreaName}: {string.Join(", ", bmd.BundleDisplayNames.Keys.ToList().Select(key => key))}"))),
 				($"CCC: CCC {nameof(Bundles.CustomAreaNamesAndNumbers)}[{Bundles.CustomAreaNamesAndNumbers.Count}]:",
 				string.Join(Environment.NewLine,
 					Bundles.CustomAreaNamesAndNumbers.Select(pair => $"{pair.Key}: {pair.Value}"))),

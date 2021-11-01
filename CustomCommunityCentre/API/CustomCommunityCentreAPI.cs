@@ -5,23 +5,24 @@ namespace CustomCommunityCentre.API
 {
 	public interface ICustomCommunityCentreAPI
 	{
-		StardewValley.Locations.CommunityCenter GetCommunityCentre();
-		Dictionary<string, int> GetCustomAreaNamesAndNumbers();
-		bool IsCommunityCentreCompleteEarly();
-		bool IsCommunityCentreDefinitelyComplete();
-		bool AreAnyCustomAreasLoaded();
-		bool AreAnyCustomBundlesLoaded();
-		bool AreaAllCustomAreasComplete();
-		IEnumerable<string> GetAllAreaNames();
-		Dictionary<int, int[]> GetAllCustomAreaNumbersAndBundleNumbers();
-		bool IsCustomArea(int areaNumber);
-		bool IsCustomBundle(int bundleNumber);
-		int GetTotalAreasComplete();
-		int GetTotalAreaCount();
-		string GetAreaNameAsAssetKey(string areaName);
+		public void LoadContentPack(string absoluteDirectoryPath);
+		public StardewValley.Locations.CommunityCenter GetCommunityCentre();
+		public Dictionary<string, int> GetCustomAreaNamesAndNumbers();
+		public bool IsCommunityCentreCompleteEarly();
+		public bool IsCommunityCentreDefinitelyComplete();
+		public bool AreAnyCustomAreasLoaded();
+		public bool AreAnyCustomBundlesLoaded();
+		public bool AreaAllCustomAreasComplete();
+		public IEnumerable<string> GetAllAreaNames();
+		public Dictionary<int, int[]> GetAllCustomAreaNumbersAndBundleNumbers();
+		public bool IsCustomArea(int areaNumber);
+		public bool IsCustomBundle(int bundleNumber);
+		public int GetTotalAreasComplete();
+		public int GetTotalAreaCount();
+		public string GetAreaNameAsAssetKey(string areaName);
 	}
 
-	public class CustomCommunityCentreAPI
+	public class CustomCommunityCentreAPI : ICustomCommunityCentreAPI
 	{
 		private readonly IReflectionHelper Reflection;
 
@@ -30,72 +31,81 @@ namespace CustomCommunityCentre.API
 			this.Reflection = reflection;
 		}
 
-		public static StardewValley.Locations.CommunityCenter GetCommunityCentre()
+		public void LoadContentPack(string absoluteDirectoryPath)
+        {
+			CustomCommunityCentre.Events.Content.LoadingContentPacks +=
+				(object sender, CustomCommunityCentre.Events.Content.LoadingContentPacksEventArgs e) =>
+				{
+					e.LoadContentPack(absoluteDirectoryPath: absoluteDirectoryPath);
+				};
+        }
+
+		public StardewValley.Locations.CommunityCenter GetCommunityCentre()
 		{
 			return Bundles.CC;
 		}
 
-		Dictionary<string, int> GetCustomAreaNamesAndNumbers()
+		public Dictionary<string, int> GetCustomAreaNamesAndNumbers()
 		{
 			return Bundles.CustomAreaNamesAndNumbers;
 		}
 
-		bool IsCommunityCentreCompleteEarly()
+		public bool IsCommunityCentreCompleteEarly()
 		{
 			return Bundles.IsCommunityCentreCompleteEarly(Bundles.CC);
 		}
 
-		bool IsCommunityCentreDefinitelyComplete()
+		public bool IsCommunityCentreDefinitelyComplete()
 		{
 			return Bundles.IsCommunityCentreDefinitelyComplete(Bundles.CC);
 		}
 
-		bool AreAnyCustomAreasLoaded()
+		public bool AreAnyCustomAreasLoaded()
 		{
 			return Bundles.AreAnyCustomAreasLoaded();
 		}
 
-		bool AreAnyCustomBundlesLoaded()
+		public bool AreAnyCustomBundlesLoaded()
 		{
 			return Bundles.AreAnyCustomBundlesLoaded();
 		}
 
-		bool AreaAllCustomAreasComplete()
+		public bool AreaAllCustomAreasComplete()
 		{
 			return Bundles.AreaAllCustomAreasComplete(Bundles.CC);
 		}
 
-		IEnumerable<string> GetAllAreaNames()
+		public IEnumerable<string> GetAllAreaNames()
 		{
 			return Bundles.GetAllAreaNames();
 		}
 
-		string GetAreaNameAsAssetKey(string areaName)
+		public string GetAreaNameAsAssetKey(string areaName)
 		{
 			return Bundles.GetAreaNameAsAssetKey(areaName);
 		}
 
-		Dictionary<int, int[]> GetAllCustomAreaNumbersAndBundleNumbers()
+		public Dictionary<int, int[]> GetAllCustomAreaNumbersAndBundleNumbers()
 		{
 			return Bundles.GetAllCustomAreaNumbersAndBundleNumbers();
 		}
 
-		bool IsCustomArea(int areaNumber)
+		public bool IsCustomArea(int areaNumber)
 		{
 			return Bundles.IsCustomArea(areaNumber);
 		}
 
-		bool IsCustomBundle(int bundleNumber)
+		public bool IsCustomBundle(int bundleNumber)
 		{
 			return Bundles.IsCustomBundle(bundleNumber);
 		}
 
-		int GetTotalAreasComplete()
+		public int GetTotalAreasComplete()
 		{
 			return Bundles.TotalAreasCompleteCount;
 		}
 
-		int GetTotalAreaCount()
+		public int GetTotalAreaCount()
 		{
 			return Bundles.TotalAreaCount;
 		}

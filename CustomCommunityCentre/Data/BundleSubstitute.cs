@@ -1,8 +1,7 @@
 ﻿namespace CustomCommunityCentre.Data
 {
-	public class SubstituteBundleData
+	public class BundleSubstitute
 	{
-		public string BundleName;
 		public string Items = null;
 		public int? Pick = null;
 		public int? RequiredItems = null;

@@ -10,9 +10,10 @@ namespace CustomCommunityCentre
 {
     public class ModEntry : Mod
 	{
-		public static ModEntry Instance;
-		internal static Config Config;
-		public static AssetManager AssetManager;
+		public static CustomCommunityCentre.ModEntry Instance;
+		public static CustomCommunityCentre.Config Config;
+		public static CustomCommunityCentre.AssetManager AssetManager;
+		public static List<CustomCommunityCentre.Data.ContentPack> ContentPacks;
 
 		// Constant values
 		public const int DummyId = 6830 * 10000;
@@ -32,9 +33,9 @@ namespace CustomCommunityCentre
 
 		public override void Entry(IModHelper helper)
 		{
-			ModEntry.Instance = this;
-			ModEntry.Config = helper.ReadConfig<Config>();
-			ModEntry.AssetManager = new AssetManager();
+			CustomCommunityCentre.ModEntry.Instance = this;
+			CustomCommunityCentre.ModEntry.Config = helper.ReadConfig<CustomCommunityCentre.Config>();
+			CustomCommunityCentre.ModEntry.AssetManager = new CustomCommunityCentre.AssetManager();
 
 			this.RegisterEvents();
 			this.AddConsoleCommands();
@@ -42,8 +43,8 @@ namespace CustomCommunityCentre
 			string id = this.ModManifest.UniqueID;
 			HarmonyPatches.ApplyHarmonyPatches(id: id);
 
-			helper.Content.AssetLoaders.Add(ModEntry.AssetManager);
-			helper.Content.AssetEditors.Add(ModEntry.AssetManager);
+			helper.Content.AssetLoaders.Add(CustomCommunityCentre.ModEntry.AssetManager);
+			helper.Content.AssetEditors.Add(CustomCommunityCentre.ModEntry.AssetManager);
 		}
 
 		public override object GetApi()
@@ -53,16 +54,15 @@ namespace CustomCommunityCentre
 
 		private void AddConsoleCommands()
 		{
-			if (ModEntry.Config.DebugMode)
+			if (CustomCommunityCentre.ModEntry.Config.DebugMode)
 			{
-				this.Helper.ConsoleCommands.Add(ModEntry.CommandPrefix + "debug1", "...", (s, args) =>
+				this.Helper.ConsoleCommands.Add(CustomCommunityCentre.ModEntry.CommandPrefix + "debug1", "...", (s, args) =>
 				{
-					
 					Log.D($"{nameof(Game1.player.mailForTomorrow)}:{string.Join(System.Environment.NewLine, Game1.player.mailForTomorrow)}");
 					Log.D($"{nameof(Game1.player.mailbox)}:{string.Join(System.Environment.NewLine, Game1.player.mailbox)}");
 					Log.D($"{nameof(Game1.player.mailReceived)}:{string.Join(System.Environment.NewLine, Game1.player.mailReceived)}");
 					Log.D($"{nameof(Game1.player.eventsSeen)}:{string.Join(System.Environment.NewLine, Game1.player.eventsSeen)}");
-					
+
 					/*
 					var tempCC = new CommunityCenter();
 					var CompletedItems = tempCC.bundlesDict();
@@ -86,12 +86,13 @@ namespace CustomCommunityCentre
 				});
 			}
 
-			//BundleManager.AddConsoleCommands(cmd: ModEntry.CommandPrefix);
-			Bundles.AddConsoleCommands(cmd: ModEntry.CommandPrefix);
+			BundleManager.AddConsoleCommands(cmd: CustomCommunityCentre.ModEntry.CommandPrefix);
+			Bundles.AddConsoleCommands(cmd: CustomCommunityCentre.ModEntry.CommandPrefix);
 		}
 
 		private void RegisterEvents()
 		{
+			this.Helper.Events.GameLoop.GameLaunched += this.GameLoop_GameLaunched;
 			this.Helper.Events.GameLoop.ReturnedToTitle += this.GameLoop_ReturnedToTitle;
 			this.Helper.Events.GameLoop.SaveLoaded += this.GameLoop_SaveLoaded;
 			this.Helper.Events.GameLoop.DayStarted += this.GameLoop_DayStarted;
@@ -100,7 +101,26 @@ namespace CustomCommunityCentre
 			Bundles.RegisterEvents();
 		}
 
-		private void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
+        private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
+        {
+            this.Helper.Events.GameLoop.OneSecondUpdateTicked += Event_LoadAssetsLate;
+		}
+
+        private void Event_LoadAssetsLate(object sender, OneSecondUpdateTickedEventArgs e)
+		{
+			// Reason for being late:
+			// Delay content pack loading until after all SMAPI mod-provided content packs have been loaded
+			this.Helper.Events.GameLoop.OneSecondUpdateTicked -= Event_LoadAssetsLate;
+
+			if (CustomCommunityCentre.ModEntry.ContentPacks == null)
+			{
+				// Fetch and load all custom content packs through the SMAPI content pack API,
+				// as well as through SMAPI mod-provided event handlers
+				CustomCommunityCentre.Data.ContentPack.Load(helper: Helper);
+			}
+		}
+
+        private void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
 		{
 			this.IsSaveLoaded = false;
 		}
@@ -112,7 +132,7 @@ namespace CustomCommunityCentre
 
 		private void GameLoop_DayStarted(object sender, DayStartedEventArgs e)
 		{
-			if (ModEntry.IsNewGame && !this.IsSaveLoaded)
+			if (CustomCommunityCentre.ModEntry.IsNewGame && !this.IsSaveLoaded)
 			{
 				// Perform OnSaveLoaded behaviours when starting a new game
 				this.SaveLoadedBehaviours();
@@ -148,7 +168,9 @@ namespace CustomCommunityCentre
 
 		public static Vector2 FindFirstPlaceableTileAroundPosition(GameLocation location, StardewValley.Object o, Vector2 tilePosition, int maxIterations)
 		{
-			// Recursive search logic taken from StardewValley.Utility.RecursiveFindOpenTiles()
+			// Recursive search logic taken from Stardew Valley
+			// See StardewValley.Utility.cs:RecursiveFindOpenTiles()
+
 			int iterations = 0;
 			Queue<Vector2> positionsToCheck = new();
 			positionsToCheck.Enqueue(tilePosition);

@@ -29,7 +29,12 @@ namespace CustomCommunityCentre
             Helper.Events.GameLoop.Saved += BundleManager.GameLoop_Saved;
 		}
 
-        private static void GameLoop_Saved(object sender, SavedEventArgs e)
+		internal static void AddConsoleCommands(string cmd)
+		{
+			// . . .
+		}
+
+		private static void GameLoop_Saved(object sender, SavedEventArgs e)
         {
 			Log.T("Saved");
         }
@@ -51,6 +56,7 @@ namespace CustomCommunityCentre
 		private static void GameLoop_DayEnding(object sender, DayEndingEventArgs e)
 		{
 			Log.T("DayEnding");
+
 			// Save local (and/or persistent) community centre data
 			BundleManager.Save(Bundles.CC);
 		}
@@ -59,9 +65,6 @@ namespace CustomCommunityCentre
 		{
 			Log.D($"Loaded save: {Game1.player.Name} ({Game1.player.farmName}).",
 				Config.DebugMode);
-
-			// Prepare custom area-bundle data
-			Helper.Content.InvalidateCache(AssetManager.BundleDefinitionsAssetKey);
 		}
 
 		internal static void DayStartedBehaviours(CommunityCenter cc)
@@ -88,23 +91,17 @@ namespace CustomCommunityCentre
 
 		internal static void Clear()
 		{
-			Bundles.SetCC(cc: null);
-
 			Bundles.CustomBundleDonations.Clear();
 			Bundles.CustomAreaBundleKeys.Clear();
 			Bundles.CustomAreaNamesAndNumbers.Clear();
 			Bundles.CustomAreasComplete.Clear();
-
-			Bundles.BundleData.Clear();
 
 			Bundles.CustomAreaInitialIndex = 0;
 			Bundles.CustomBundleInitialIndex = 0;
 			Bundles.DefaultMaxArea = 0;
 			Bundles.DefaultMaxBundle = 0;
 
-			/*
-			Bundles.CustomBundleMetadata.Clear();
-			*/
+			Bundles.SetCC(cc: null);
 		}
 
 		internal static void Generate(bool isLoadingCustomContent)
@@ -142,9 +139,9 @@ namespace CustomCommunityCentre
 			Random r = new ((int)Game1.uniqueIDForThisGame * 9); // copied from StardewValley.Game1.GenerateBundles(...)
 			if (isLoadingCustomContent)
 			{
-				Helper.Content.InvalidateCache(CustomCommunityCentre.AssetManager.BundleDataAssetKey); // Farmhand idiocy
+				Helper.Content.InvalidateCache(CustomCommunityCentre.AssetManager.BundleCacheAssetKey); // Farmhand idiocy
 				Dictionary<string, string> bundleData = new StardewValley.BundleGenerator().Generate(
-					bundle_data_path: CustomCommunityCentre.AssetManager.BundleDataAssetKey, // Internal sneaky asset business
+					bundle_data_path: CustomCommunityCentre.AssetManager.BundleCacheAssetKey, // Internal sneaky asset business
 					rng: r);
 
 				// Add bundle data entries, ignoring existing values for mod compatibility
@@ -178,19 +175,24 @@ namespace CustomCommunityCentre
 			}
 		}
 
-		internal static List<StardewValley.GameData.RandomBundleData> Parse(Dictionary<string, List<StardewValley.GameData.RandomBundleData>> bundleDefinitions)
+        internal static List<StardewValley.GameData.RandomBundleData> Parse()
 		{
-			var randomBundleData = Game1.content.Load
-				<List<StardewValley.GameData.RandomBundleData>>
-				(@"Data/RandomBundles");
-			var bundleSubstitutes = Game1.content.Load
-				<Dictionary<string, Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.SubstituteBundleData>>>>>
-				(AssetManager.BundleSubstitutesAssetKey)
-				[AssetManager.BundleSubstitutesKey];
-
-			var defaultBundleData = Game1.content.LoadBase
-				<Dictionary<string, string>>
-				(@"Data/Bundles");
+            static List<StardewValley.GameData.BundleData> bundleEntriesToData(Dictionary<string, CustomCommunityCentre.Data.Bundle> entries)
+            {
+				return entries
+					.Select(bsd => new StardewValley.GameData.BundleData()
+					{
+						Name = bsd.Key,
+						Color = bsd.Value.Colour,
+						Index = bsd.Value.Index,
+						Items = bsd.Value.Items,
+						Pick = bsd.Value.Pick,
+						RequiredItems = bsd.Value.RequiredItems,
+						Reward = bsd.Value.Reward,
+						Sprite = bsd.Value.Sprite
+					})
+					.ToList();
+			}
 
 			StringBuilder errorMessage = new();
 
@@ -202,54 +204,50 @@ namespace CustomCommunityCentre
 			int areaSum = Bundles.CustomAreaInitialIndex;
 			int bundleSum = Bundles.CustomBundleInitialIndex;
 
-			foreach (string bundleDefinitionEntry in bundleDefinitions.Keys)
+			List<StardewValley.GameData.RandomBundleData> parsedBundleDefinitions = new();
+			foreach (CustomCommunityCentre.Data.ContentPack contentPack in CustomCommunityCentre.ModEntry.ContentPacks)
 			{
-				Log.D($"Checking bundle definitions from '{bundleDefinitionEntry}'",
-					ModEntry.Config.DebugMode);
-
-				for (int i = bundleDefinitions[bundleDefinitionEntry].Count - 1; i >= 0; --i)
+				foreach (string areaName in contentPack.Definitions.Keys.ToList())
 				{
-					StardewValley.GameData.RandomBundleData area = bundleDefinitions[bundleDefinitionEntry][i];
+					Log.D($"Checking bundle definitions from '{contentPack.Source.Manifest.UniqueID}'",
+						ModEntry.Config.DebugMode);
+
 					// Validate areas
-					if (area.AreaName == null)
-					{
-						errorMessage.AppendLine($"Area for '{bundleDefinitionEntry}' was not loaded: Area name was null.");
-						bundleDefinitions[bundleDefinitionEntry].RemoveAt(i);
-						continue;
-					}
-					IEnumerable<char> badChars = area.AreaName
+					IEnumerable<char> badChars = areaName
 						.Where(c => CustomCommunityCentre.AssetManager.ForbiddenAssetNameCharacters.Contains(c))
 						.Distinct();
 					if (badChars.Any())
 					{
-						errorMessage.AppendLine($"Area '{area.AreaName}' was not loaded: Area name contains forbidden characters '{string.Join(", ", badChars)}'");
-						bundleDefinitions[bundleDefinitionEntry].RemoveAt(i);
+						errorMessage.AppendLine($"Area '{areaName}' was not loaded: Area name contains forbidden characters '{string.Join(", ", badChars)}'");
+						contentPack.Definitions.Remove(areaName);
 						continue;
 					}
-					if (!area.AreaName.StartsWith(CustomCommunityCentre.AssetManager.RequiredAssetNamePrefix, StringComparison.InvariantCulture))
+					if (!areaName.StartsWith(CustomCommunityCentre.AssetManager.RequiredAssetNamePrefix, StringComparison.InvariantCulture))
 					{
-						errorMessage.AppendLine($"Area '{area.AreaName}' was not loaded: Area name does not start with required asset name prefix '{CustomCommunityCentre.AssetManager.RequiredAssetNamePrefix}'");
-						bundleDefinitions[bundleDefinitionEntry].RemoveAt(i);
+						errorMessage.AppendLine($"Area '{areaName}' was not loaded: Area name does not start with required asset name prefix '{CustomCommunityCentre.AssetManager.RequiredAssetNamePrefix}'");
+						contentPack.Definitions.Remove(areaName);
 						continue;
 					}
-					if (area.AreaName.Split(CustomCommunityCentre.AssetManager.RequiredAssetNameDivider).Length < 3)
+					if (areaName.Split(CustomCommunityCentre.AssetManager.RequiredAssetNameDivider).Length < 3)
 					{
-						errorMessage.AppendLine($"Area '{area.AreaName}' was not loaded: Area does not split name with '{CustomCommunityCentre.AssetManager.RequiredAssetNameDivider}'");
-						bundleDefinitions[bundleDefinitionEntry].RemoveAt(i);
+						errorMessage.AppendLine($"Area '{areaName}' was not loaded: Area does not split name with '{CustomCommunityCentre.AssetManager.RequiredAssetNameDivider}'");
+						contentPack.Definitions.Remove(areaName);
 						continue;
 					}
 
 					// Validate bundles
-					List<StardewValley.GameData.BundleData> bundles = area.BundleSets
-					   // Default bundles
-					   .SelectMany(bsd => bsd.Bundles)
-					   // Random bundles
-					   .Concat(area.Bundles)
-					   .ToList();
+					List<StardewValley.GameData.BundleData> bundles =
+						// Default bundles
+						bundleEntriesToData(entries: contentPack.Definitions[areaName].BundleSets
+							.SelectMany(dict => dict)
+							.ToDictionary(pair => pair.Key, pair => pair.Value))
+						// Random bundles
+						.Concat(bundleEntriesToData(entries: contentPack.Definitions[areaName].Bundles))
+						.ToList();
 					if (bundles.Any(bundle => bundle?.Name == null))
 					{
-						errorMessage.AppendLine($"Area {i + 1} was not loaded: Bundle or {nameof(StardewValley.GameData.BundleData.Name)} was null.");
-						bundleDefinitions[bundleDefinitionEntry].RemoveAt(i);
+						errorMessage.AppendLine($"Area {areaName} was not loaded: Bundle or {nameof(StardewValley.GameData.BundleData.Name)} was null.");
+						contentPack.Definitions.Remove(areaName);
 						continue;
 					}
 					badChars = bundles
@@ -261,8 +259,8 @@ namespace CustomCommunityCentre
 						badNames = bundles
 							.Where(b => b.Name.Any(c => CustomCommunityCentre.AssetManager.ForbiddenAssetNameCharacters.Contains(c)))
 							.Select(b => b.Name);
-						errorMessage.AppendLine($"Area '{area.AreaName}' was not loaded: Bundle '{string.Join(",", badNames)}' contains forbidden characters '{string.Join(", ", badChars)}'");
-						bundleDefinitions[bundleDefinitionEntry].RemoveAt(i);
+						errorMessage.AppendLine($"Area '{areaName}' was not loaded: Bundle '{string.Join(",", badNames)}' contains forbidden characters '{string.Join(", ", badChars)}'");
+						contentPack.Definitions.Remove(areaName);
 						continue;
 					}
 					badNames = bundles
@@ -270,8 +268,8 @@ namespace CustomCommunityCentre
 						.Select(b => b.Name);
 					if (badNames.Any())
 					{
-						errorMessage.AppendLine($"Area '{area.AreaName}' was not loaded: Bundle '{string.Join(",", badNames)}' does not start with required asset name prefix '{CustomCommunityCentre.AssetManager.RequiredAssetNamePrefix}'");
-						bundleDefinitions[bundleDefinitionEntry].RemoveAt(i);
+						errorMessage.AppendLine($"Area '{areaName}' was not loaded: Bundle '{string.Join(",", badNames)}' does not start with required asset name prefix '{CustomCommunityCentre.AssetManager.RequiredAssetNamePrefix}'");
+						contentPack.Definitions.Remove(areaName);
 						continue;
 					}
 					badNames = bundles
@@ -279,8 +277,8 @@ namespace CustomCommunityCentre
 						.Select(b => b.Name);
 					if (badNames.Any())
 					{
-						errorMessage.AppendLine($"Area '{area.AreaName}' was not loaded: Bundle '{string.Join(",", badNames)}' does not split name with '{CustomCommunityCentre.AssetManager.RequiredAssetNameDivider}'");
-						bundleDefinitions[bundleDefinitionEntry].RemoveAt(i);
+						errorMessage.AppendLine($"Area '{areaName}' was not loaded: Bundle '{string.Join(",", badNames)}' does not split name with '{CustomCommunityCentre.AssetManager.RequiredAssetNameDivider}'");
+						contentPack.Definitions.Remove(areaName);
 						continue;
 					}
 
@@ -297,78 +295,86 @@ namespace CustomCommunityCentre
 						.Distinct()
 						.ToArray();
 
-					area.Keys = string.Join(" ", bundleNumbers);
+					// Add parsed definition to list
+					StardewValley.GameData.RandomBundleData area = new()
+					{
+						AreaName = areaName,
+						Keys = string.Join(" ", bundleNumbers),
+						Bundles = bundleEntriesToData(entries: contentPack.Definitions[areaName].Bundles),
+						BundleSets = contentPack.Definitions[areaName].BundleSets
+							.Select(dict => new StardewValley.GameData.BundleSetData()
+							{
+								Bundles = bundleEntriesToData(entries: dict)
+							})
+							.ToList()
+					};
+					parsedBundleDefinitions.Add(area);
 
 					// Set custom area-bundle dictionary values
-					Bundles.CustomAreaBundleKeys[area.AreaName] = bundleKeys;
+					Bundles.CustomAreaBundleKeys[areaName] = bundleKeys;
 					Bundles.CustomAreasComplete[areaSum] = false;
-					Bundles.CustomAreaNamesAndNumbers[area.AreaName] = areaSum;
+					Bundles.CustomAreaNamesAndNumbers[areaName] = areaSum;
 
+					// Increment counters used for area numbers and bundle keys
 					bundleSum += bundleNumbers.Length;
 					areaSum++;
 
-					Log.D($"Adding bundles for area '{area.AreaName}':{Environment.NewLine}{string.Join(Environment.NewLine, bundleKeys)}",
+					Log.D($"Added bundles for area '{areaName}':{Environment.NewLine}{string.Join(Environment.NewLine, bundleKeys)}",
 						ModEntry.Config.DebugMode);
 				}
 			}
-			// Replace bundle entries with substitute values
-			foreach (string bundleSubstituteEntry in bundleSubstitutes.Keys)
+
+			foreach (CustomCommunityCentre.Data.ContentPack contentPack in CustomCommunityCentre.ModEntry.ContentPacks)
 			{
-				Log.D($"Checking substitute bundles for '{bundleSubstituteEntry}'",
+				// Replace bundle entries with substitute values
+				Log.D($"Checking substitute bundles from '{contentPack.Source.Manifest.UniqueID}'",
 					ModEntry.Config.DebugMode);
 
-				foreach (string uniqueId in bundleSubstitutes[bundleSubstituteEntry].Keys)
+				foreach (string targetId in contentPack.Substitutes.Keys.ToList())
 				{
-					if (!ModEntry.Instance.Helper.ModRegistry.IsLoaded(uniqueID: uniqueId))
+					if (!ModEntry.Instance.Helper.ModRegistry.IsLoaded(uniqueID: targetId))
 					{
-						Log.D($"Skipping substitute bundles for '{uniqueId}': Not loaded.",
+						Log.D($"Skipping substitutes for bundle '{targetId}': Not loaded.",
 							ModEntry.Config.DebugMode);
 						continue;
 					}
 
-					Log.D($"Loading substitute bundles for '{uniqueId}'...",
+					Log.D($"Loading substitutes for bundle '{targetId}'...",
 						ModEntry.Config.DebugMode);
 
-					for (int i = bundleSubstitutes[bundleSubstituteEntry][uniqueId].Count - 1; i >= 0; --i)
+					foreach (string bundleName in contentPack.Substitutes[targetId].Keys.ToList())
 					{
-						CustomCommunityCentre.Data.SubstituteBundleData bundleSubstitute = bundleSubstitutes[bundleSubstituteEntry][uniqueId][i];
+						CustomCommunityCentre.Data.BundleSubstitute bundleSubstitute
+							= contentPack.Substitutes[targetId][bundleName];
 
 						// Validate bundle substitutes
-						if (bundleSubstitute.BundleName == null)
-						{
-							errorMessage.AppendLine($"Bundle substitute for '{uniqueId}' was not loaded: {nameof(CustomCommunityCentre.Data.SubstituteBundleData.BundleName)} was null.");
-							bundleSubstitutes[bundleSubstituteEntry][uniqueId].RemoveAt(i);
-							continue;
-						}
-						IEnumerable<char> badChars = bundleSubstitute.BundleName.Where(c => AssetManager.ForbiddenAssetNameCharacters.Contains(c)).Distinct();
+						IEnumerable<char> badChars = bundleName.Where(c => AssetManager.ForbiddenAssetNameCharacters.Contains(c)).Distinct();
 						if (badChars.Any())
 						{
-							errorMessage.AppendLine($"Bundle substitute for '{bundleSubstitute.BundleName}' was not loaded: {nameof(CustomCommunityCentre.Data.SubstituteBundleData.BundleName)} contains forbidden characters '{string.Join(", ", badChars)}'");
-							bundleSubstitutes[bundleSubstituteEntry][uniqueId].RemoveAt(i);
+							errorMessage.AppendLine($"Substitute for bundle '{bundleName}' was not loaded: Bundle name contains forbidden characters '{string.Join(", ", badChars)}'");
+							contentPack.Substitutes[targetId].Remove(bundleName);
 							continue;
 						}
 
 						// Find matching bundle for substitute bundle
-						var _bundles = bundleDefinitions.Values
-							.SelectMany(rbd => rbd);
-						IEnumerable<StardewValley.GameData.BundleData> bundles = _bundles
+						IEnumerable<StardewValley.GameData.BundleData> bundles = parsedBundleDefinitions
 							// Default bundles
 							.SelectMany(rbd => rbd.BundleSets.SelectMany(bd => bd.Bundles))
 							// Random bundles
-							.Concat(_bundles.SelectMany(rbd => rbd.Bundles));
+							.Concat(parsedBundleDefinitions.SelectMany(rbd => rbd.Bundles));
 						StardewValley.GameData.BundleData bundle = bundles
-							.FirstOrDefault(bd => bd.Name == bundleSubstitute.BundleName);
+							.FirstOrDefault(bd => bd.Name == bundleName);
 
 						if (bundle == null)
 						{
-							Log.D($"Skipping substitute bundle '{bundleSubstitute.BundleName}': Match not found.",
+							Log.D($"Skipping substitute for bundle '{bundleName}': Match not found.",
 								ModEntry.Config.DebugMode);
 							continue;
 						}
 
-						Log.D($"Substituting bundle: '{bundleSubstitute.BundleName}'...",
+						Log.D($"Substituting bundle: '{bundleName}'",
 							ModEntry.Config.DebugMode);
-
+						
 						// Substitute entries in bundle with provided values
 						if (!string.IsNullOrWhiteSpace(bundleSubstitute.Items))
 							bundle.Items = bundleSubstitute.Items;
@@ -389,15 +395,14 @@ namespace CustomCommunityCentre
 			}
 
 			// Append custom bundle data to default random bundle data after modifications
-			List<StardewValley.GameData.RandomBundleData> outData = bundleDefinitions
-				.Select(pair => pair.Value)
-				.SelectMany(rbd => rbd)
-				.ToList();
-			outData = randomBundleData
-				.Union(outData)
+			var randomBundleData = Game1.content.Load
+				<List<StardewValley.GameData.RandomBundleData>>
+				(@"Data/RandomBundles");
+			parsedBundleDefinitions = randomBundleData
+				.Union(parsedBundleDefinitions)
 				.ToList();
 
-			return outData;
+			return parsedBundleDefinitions;
 		}
 
 		internal static void Load(CommunityCenter cc)

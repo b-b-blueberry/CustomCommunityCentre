@@ -39,14 +39,20 @@ namespace CommunityKitchen
 		};
 		public static Vector2 FridgeTilePosition = Vector2.Zero;
 
+		// Esca's Modding Plugins integrations
+		public static string EMPTileActionKitchen;
+		public static string EMPMapPropertyMinifridges;
+
 
 		internal static void RegisterEvents()
 		{
+            Helper.Events.GameLoop.GameLaunched += Kitchen.GameLoop_GameLaunched;
 			Helper.Events.Input.ButtonPressed += Kitchen.Input_ButtonPressed;
 			Helper.Events.Display.MenuChanged += Kitchen.Display_MenuChanged;
 
-			CustomCommunityCentre.Events.LoadedArea += Kitchen.OnLoadedArea;
-			CustomCommunityCentre.Events.ResetSharedState += Kitchen.OnResetSharedState;
+            CustomCommunityCentre.Events.Content.LoadingContentPacks += Kitchen.Events_OnLoadingContentPacks;
+			CustomCommunityCentre.Events.Game.AreaLoaded += Kitchen.Events_OnLoadedArea;
+			CustomCommunityCentre.Events.Game.ResetSharedState += Kitchen.Events_OnResetSharedState;
 		}
 
         internal static void AddConsoleCommands(string cmd)
@@ -62,6 +68,11 @@ namespace CommunityKitchen
 		internal static void DayStartedBehaviours()
 		{
 			// . . .
+		}
+
+		private static void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
+		{
+			Kitchen.LoadEMPValues();
 		}
 
 		private static void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
@@ -88,7 +99,7 @@ namespace CommunityKitchen
 						// Use Community Centre kitchen as a cooking station
 						if (Kitchen.CookingTileIndexes[Kitchen.FridgeTilesToUse].Contains(tile.TileIndex))
 						{
-							Kitchen.TryOpenCookingMenu(cc: cc, button: e.Button);
+							Kitchen.TryOpenCookingMenuFromKitchenTile(cc: cc, tilePosition: e.Cursor.GrabTile, button: e.Button);
 
 							return;
 						}
@@ -111,10 +122,16 @@ namespace CommunityKitchen
 			if (e.OldMenu is TitleMenu || e.NewMenu is TitleMenu || Game1.currentLocation == null || Game1.player == null)
 				return;
 
+			bool isCraftingMenu(IClickableMenu menu)
+            {
+				return menu is ItemGrabMenu
+					|| menu is CraftingPage
+					|| nameof(menu).EndsWith("CraftingPage", StringComparison.InvariantCultureIgnoreCase)
+					|| nameof(menu).EndsWith("CookingMenu", StringComparison.InvariantCultureIgnoreCase);
+			}
+
 			// Close Community Centre fridge door after use in the renovated kitchen
-			bool isOldMenuCraftingPage = e.OldMenu is ItemGrabMenu || e.OldMenu is CraftingPage
-				|| nameof(e.OldMenu).EndsWith("CraftingPage", StringComparison.InvariantCultureIgnoreCase);
-			if (isOldMenuCraftingPage && e.NewMenu == null && Game1.currentLocation is CommunityCenter cc)
+			if (Game1.currentLocation is CommunityCenter cc && isCraftingMenu(e.OldMenu) && !isCraftingMenu(e.NewMenu))
 			{
 				Kitchen.TrySetFridgeDoor(cc: cc, isOpening: false, isUsingChest: false);
 
@@ -122,21 +139,49 @@ namespace CommunityKitchen
 			}
 		}
 
-		private static void OnLoadedArea(object sender, EventArgs e)
+		private static void Events_OnLoadingContentPacks(object sender, CustomCommunityCentre.Events.Content.LoadingContentPacksEventArgs e)
 		{
-			if (((CustomCommunityCentre.AreaLoadedEventArgs)e).AreaName != Kitchen.KitchenAreaName)
-				return;
-
-			CommunityCenter cc = ((CustomCommunityCentre.AreaLoadedEventArgs)e).CommunityCentre;
-			Kitchen.SetUpKitchen(cc);
+			string path = System.IO.Path.Combine(Helper.DirectoryPath, CommunityKitchen.AssetManager.KitchenContentPackPath);
+			e.LoadContentPack(path);
 		}
 
-		private static void OnResetSharedState(object sender, EventArgs e)
+		private static void Events_OnLoadedArea(object sender, CustomCommunityCentre.Events.Game.AreaLoadedEventArgs e)
 		{
-			CommunityCenter cc = ((CustomCommunityCentre.ResetSharedStateEventArgs)e).CommunityCentre;
-			if (Kitchen.IsKitchenComplete(cc))
+			if (e.AreaName != Kitchen.KitchenAreaName)
+				return;
+
+			Kitchen.SetUpKitchen(e.CommunityCentre);
+		}
+
+		private static void Events_OnResetSharedState(object sender, CustomCommunityCentre.Events.Game.ResetSharedStateEventArgs e)
+		{
+			if (Kitchen.IsKitchenComplete(e.CommunityCentre))
 			{
-				Kitchen.SetUpKitchen(cc);
+				Kitchen.SetUpKitchen(e.CommunityCentre);
+			}
+		}
+
+		private static void LoadEMPValues()
+		{
+			// Load values from Esca's Modding Plugins
+			if (Helper.ModRegistry.IsLoaded("Esca.EMP"))
+			{
+				Type type;
+
+				type = HarmonyLib.AccessTools.TypeByName("EscasModdingPlugins.HarmonyPatch_ActionKitchen");
+				Kitchen.EMPTileActionKitchen = (string)type
+					?.GetProperty("ActionName", bindingAttr: System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+					?.GetValue(obj: null);
+
+				type = HarmonyLib.AccessTools.TypeByName("EscasModdingPlugins.HarmonyPatch_AllowMiniFridges");
+				Kitchen.EMPMapPropertyMinifridges = (string)type
+					?.GetProperty("MapPropertyName", bindingAttr: System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+					?.GetValue(obj: null);
+
+				if (Kitchen.EMPTileActionKitchen == null || Kitchen.EMPMapPropertyMinifridges == null)
+				{
+					Log.E($"Failed to load values from Esca's Modding Plugins. Submit a bug report!");
+				}
 			}
 		}
 
@@ -177,6 +222,13 @@ namespace CommunityKitchen
 
 			// Update kitchen fridge chest
 			Kitchen.GetKitchenFridge(cc);
+
+			// Implement Esca's Modding Plugins features if available
+			if (Kitchen.EMPMapPropertyMinifridges != null)
+			{
+				// Allow mini-fridges to be placed in the Community Centre
+				cc.Map.Properties[Kitchen.EMPMapPropertyMinifridges] = true;
+			}
 		}
 
 		public static Chest GetKitchenFridge(CommunityCenter cc)
@@ -184,7 +236,7 @@ namespace CommunityKitchen
             // Update fridge chest object if null
             if (!cc.Objects.TryGetValue(Kitchen.FridgeChestPosition, out StardewValley.Object o) || o is not Chest chest)
             {
-                chest = new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition);
+                chest = new Chest(playerChest: true, tileLocation: Kitchen.FridgeChestPosition, parentSheetIndex: 216);
                 chest.fridge.Value = true;
                 cc.Objects[Kitchen.FridgeChestPosition] = chest;
             }
@@ -216,11 +268,11 @@ namespace CommunityKitchen
 			return Game1.MasterPlayer.hasOrWillReceiveMail(string.Format(Bundles.MailAreaCompleted, Kitchen.KitchenAreaName));
 		}
 
-		private static void TryOpenCookingMenu(CommunityCenter cc, SButton button)
+		private static void TryOpenCookingMenuFromKitchenTile(CommunityCenter cc, Vector2 tilePosition, SButton button)
 		{
 			Helper.Input.Suppress(button);
 			
-			Kitchen.TryOpenCookingMenu(cc: cc, fridge: Kitchen.GetKitchenFridge(cc));
+			Kitchen.TryOpenCookingMenu(cc: cc, tilePosition: tilePosition, fridge: Kitchen.GetKitchenFridge(cc));
 		}
 
 		private static bool TrySetFridgeDoor(CommunityCenter cc, bool isOpening, bool isUsingChest, SButton? button = null)
@@ -242,6 +294,10 @@ namespace CommunityKitchen
 					|| (isUsingChest && !((Chest)cc.Objects[Kitchen.FridgeChestPosition]).checkForAction(Game1.player))
 					? 0
 					: 2;
+				if (!isOpening)
+                {
+					((Chest)cc.Objects[Kitchen.FridgeChestPosition]).mutex.ReleaseLock();
+				}
 				cc.Map.GetLayer("Front").Tiles[tileA].TileIndex
 					= Kitchen.FridgeTileIndexes[Kitchen.FridgeTilesToUse][fridgeTiles];
 				cc.Map.GetLayer("Buildings").Tiles[tileB].TileIndex
@@ -253,8 +309,16 @@ namespace CommunityKitchen
 
 		// Taken from StardewValley.Locations.FarmHouse.cs:ActivateKitchen(NetRef<Chest> fridge)
 		// Edited to remove netref, mini-fridge and multiple-mutex references
-		public static void TryOpenCookingMenu(CommunityCenter cc, Chest fridge)
+		public static void TryOpenCookingMenu(CommunityCenter cc, Chest fridge, Vector2 tilePosition)
 		{
+			// Try opening the cooking menu via Esca's Modding Plugins
+			xTile.Dimensions.Location location = new ((int)tilePosition.X, (int)tilePosition.Y);
+			if (Kitchen.EMPTileActionKitchen != null
+				&& cc.performAction(action: Kitchen.EMPTileActionKitchen, who: Game1.player, tileLocation: location))
+				return;
+
+			// Try opening a cooking menu using our own logic otherwise
+			// Minifridges are ignored as they are only usable with Esca's Modding Plugins
 			if (fridge != null && fridge.mutex.IsLocked())
 			{
 				Game1.showRedMessage(Game1.content.LoadString("Strings\\UI:Kitchen_InUse"));
@@ -273,7 +337,8 @@ namespace CommunityKitchen
 					Point position = Utility.Vector2ToPoint(Utility.getTopLeftPositionForCenteringOnScreen(
 						width: dimensions.X,
 						height: dimensions.Y));
-					Game1.activeClickableMenu = new CraftingPage(
+					IClickableMenu menu = null;
+					menu = new CraftingPage(
 						x: position.X,
 						y: position.Y,
 						width: dimensions.X,
@@ -283,10 +348,11 @@ namespace CommunityKitchen
 						material_containers: new List<Chest> { fridge })
 					{
 						exitFunction = delegate
-						{
-							fridge.mutex.ReleaseLock();
+                        {
+                            fridge.mutex.ReleaseLock();
 						}
 					};
+					Game1.activeClickableMenu = menu;
 				},
 				failed: delegate
 				{

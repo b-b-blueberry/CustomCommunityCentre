@@ -1,0 +1,10 @@
+﻿{
+    "Name": "[CCC] Community Lounge",
+    "Author": "blueberry",
+    "Version": "1.0.0",
+    "Description": "Adds a new Lounge area to the Community Centre.",
+    "UniqueID": "blueberry.CommunityLounge.CCC",
+    "ContentPackFor": {
+        "UniqueID": "blueberry.CustomCommunityCentre"
+    }
+}

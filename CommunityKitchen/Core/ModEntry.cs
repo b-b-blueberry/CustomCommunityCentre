@@ -7,6 +7,7 @@ namespace CommunityKitchen
 	{
 		internal static ModEntry Instance;
 		internal static ITranslationHelper i18n => Instance.Helper.Translation;
+		internal static CustomCommunityCentre.API.ICustomCommunityCentreAPI ICCCAPI;
 
 		private const string CommandPrefix = "bb.cck.";
 
@@ -26,6 +27,7 @@ namespace CommunityKitchen
 
 		private void RegisterEvents()
 		{
+            this.Helper.Events.GameLoop.GameLaunched += this.GameLoop_GameLaunched;
 			this.Helper.Events.GameLoop.SaveLoaded += this.GameLoop_SaveLoaded;
 			this.Helper.Events.GameLoop.DayStarted += this.GameLoop_DayStarted;
 
@@ -33,7 +35,14 @@ namespace CommunityKitchen
 			GusDeliveryService.RegisterEvents();
 		}
 
-		private void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs e)
+        private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
+        {
+			ModEntry.ICCCAPI = Helper.ModRegistry.GetApi
+				<CustomCommunityCentre.API.ICustomCommunityCentreAPI>
+				(CustomCommunityCentre.ModEntry.Instance.Helper.ModRegistry.ModID);
+        }
+
+        private void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs e)
 		{
 			this.SaveLoadedBehaviours();
 		}

@@ -17,7 +17,10 @@ namespace CustomCommunityCentre.Data
 			public float Scale = Game1.pixelZoom;
 			public bool FloatHorizontally = true;
 			public bool FloatVertically = false;
-			public Color Colour { get => BundleMetadata.GetXnaColourFromName(this.ColourName ?? BundleMetadata.DefaultColourName); }
+			public Color Colour
+			{
+				get => BundleMetadata.GetXnaColourFromName(this.ColourName ?? BundleMetadata.DefaultColourName);
+			}
 		}
 
 		public class Cutscene
@@ -48,7 +51,10 @@ namespace CustomCommunityCentre.Data
 		public Dictionary<string, string> AreaRewardMessage;
 		public Dictionary<string, string> AreaCompleteDialogue;
 		public Dictionary<string, Dictionary<string, string>> BundleDisplayNames;
-		public Color Colour { get => BundleMetadata.GetXnaColourFromName(this.JunimoColourName ?? BundleMetadata.DefaultColourName); }
+		public Color Colour
+		{
+			get => BundleMetadata.GetXnaColourFromName(this.JunimoColourName ?? BundleMetadata.DefaultColourName);
+		}
 
 		private static Color GetXnaColourFromName(string colourName)
 		{

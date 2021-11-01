@@ -13,35 +13,31 @@ namespace CommunityKitchen
 	{
 		// Game content assets
 		public static readonly string RootGameContentPath = PathUtilities.NormalizeAssetName(
-			$@"Mods/{ModEntry.Instance.ModManifest.UniqueID}.Assets");
-		public static readonly string BundleSpritesAssetKey = Path.Combine(RootGameContentPath, "BundleSprites");
+			$@"Mods/{CommunityKitchen.ModEntry.Instance.ModManifest.UniqueID}.Assets");
 		public static readonly string DeliverySpritesAssetKey = Path.Combine(RootGameContentPath, "DeliverySprites");
 
 		// Local content assets
-		private static readonly string LocalBundleMetadataPath = @"assets/bundleMetadata";
-		private static readonly string LocalBundleDefinitionsPath = @"assets/bundleDefinitions";
-		private static readonly string LocalBundleSubstitutesPath = @"assets/bundleSubstitutes";
-		private static readonly string LocalBundleSpritesPath = @"assets/bundleSprites";
-		private static readonly string LocalDeliverySpritesPath = @"assets/deliverySprites";
+		internal static readonly string LocalDeliverySpritesPath = @"assets/deliverySprites";
+		internal static readonly string KitchenContentPackPath = @"assets/[CCC] KitchenContentPack";
+
+		// Asset lists
+		public static readonly List<string> GameAssetKeys = new()
+		{
+			@"Maps/townInterior",
+			@"Data/mail",
+		};
 
 
 		public bool CanLoad<T>(IAssetInfo asset)
 		{
-			return asset.AssetNameEquals(CommunityKitchen.AssetManager.BundleSpritesAssetKey)
-				|| asset.AssetNameEquals(CommunityKitchen.AssetManager.DeliverySpritesAssetKey);
+			return asset.AssetNameEquals(CommunityKitchen.AssetManager.DeliverySpritesAssetKey);
 		}
 
 		public T Load<T>(IAssetInfo asset)
 		{
-			if (asset.AssetNameEquals(CommunityKitchen.AssetManager.BundleSpritesAssetKey))
-			{
-				return (T)(object)ModEntry.Instance.Helper.Content.Load
-					<Texture2D>
-					($"{CommunityKitchen.AssetManager.LocalBundleSpritesPath}.png");
-			}
 			if (asset.AssetNameEquals(CommunityKitchen.AssetManager.DeliverySpritesAssetKey))
 			{
-				return (T)(object)ModEntry.Instance.Helper.Content.Load
+				return (T)(object)CommunityKitchen.ModEntry.Instance.Helper.Content.Load
 					<Texture2D>
 					($"{CommunityKitchen.AssetManager.LocalDeliverySpritesPath}.png");
 			}
@@ -50,9 +46,8 @@ namespace CommunityKitchen
 
 		public bool CanEdit<T>(IAssetInfo asset)
 		{
-			return CustomCommunityCentre.ModEntry.AssetManager.ModAssetKeys.Any(assetName => asset.AssetNameEquals(assetName))
-				|| asset.AssetNameEquals(@"Maps/townInterior")
-				|| asset.AssetNameEquals(@"Data/mail");
+			return CommunityKitchen.AssetManager.GameAssetKeys
+				.Any(assetName => asset.AssetNameEquals(assetName));
 		}
 
 		public void Edit<T>(IAssetData asset)
@@ -62,56 +57,6 @@ namespace CommunityKitchen
 
 		public void Edit(ref IAssetData asset)
 		{
-			// Add entries to custom area-bundle assets
-
-			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.BundleMetadataAssetKey))
-			{
-				var data = asset.AsDictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>>>().Data;
-				var newData = ModEntry.Instance.Helper.Content.Load
-					<Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.BundleMetadata>>>>
-					($"{CommunityKitchen.AssetManager.LocalBundleMetadataPath}.json");
-
-				data[CustomCommunityCentre.AssetManager.BundleMetadataKey]
-					= data[CustomCommunityCentre.AssetManager.BundleMetadataKey]
-						.Union(newData[CustomCommunityCentre.AssetManager.BundleMetadataKey])
-						.ToDictionary(pair => pair.Key, pair => pair.Value);
-
-				asset.ReplaceWith(data);
-				return;
-			}
-			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.BundleDefinitionsAssetKey))
-			{
-				var data = asset.AsDictionary<string, Dictionary<string, List<StardewValley.GameData.RandomBundleData>>>().Data;
-				var newData = ModEntry.Instance.Helper.Content.Load
-					<Dictionary<string, Dictionary<string, List<StardewValley.GameData.RandomBundleData>>>>
-					($"{CommunityKitchen.AssetManager.LocalBundleDefinitionsPath}.json");
-
-				data[CustomCommunityCentre.AssetManager.BundleDefinitionsKey]
-					= data[CustomCommunityCentre.AssetManager.BundleDefinitionsKey]
-						.Union(newData[CustomCommunityCentre.AssetManager.BundleDefinitionsKey])
-						.ToDictionary(pair => pair.Key, pair => pair.Value);
-
-				asset.ReplaceWith(data);
-				return;
-			}
-			if (asset.AssetNameEquals(CustomCommunityCentre.AssetManager.BundleSubstitutesAssetKey))
-			{
-				var data = asset.AsDictionary<string, Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.SubstituteBundleData>>>>().Data;
-				var newData = ModEntry.Instance.Helper.Content.Load
-					<Dictionary<string, Dictionary<string, Dictionary<string, List<CustomCommunityCentre.Data.SubstituteBundleData>>>>>
-					($"{CommunityKitchen.AssetManager.LocalBundleSubstitutesPath}.json");
-
-				data[CustomCommunityCentre.AssetManager.BundleSubstitutesKey]
-					= data[CustomCommunityCentre.AssetManager.BundleSubstitutesKey]
-						.Union(newData[CustomCommunityCentre.AssetManager.BundleSubstitutesKey])
-						.ToDictionary(pair => pair.Key, pair => pair.Value);
-
-				asset.ReplaceWith(data);
-				return;
-			}
-
-			// Edit other game assets for the kitchen
-
 			if (asset.AssetNameEquals(@"Data/mail"))
 			{
 				var data = asset.AsDictionary<string, string>().Data;
@@ -119,10 +64,10 @@ namespace CommunityKitchen
 				// Append completed mail received for all custom areas as required flags for CC completion event
 
 				string mailId = string.Format(CustomCommunityCentre.Bundles.MailAreaCompletedFollowup, Kitchen.KitchenAreaName);
-				data[mailId] = ModEntry.i18n.Get("mail.areacompletedfollowup.gus");
+				data[mailId] = CommunityKitchen.ModEntry.i18n.Get("mail.areacompletedfollowup.gus");
 
 				mailId = GusDeliveryService.MailSaloonDeliverySurchargeWaived;
-				data[mailId] = ModEntry.i18n.Get("mail.saloondeliverysurchargewaived");
+				data[mailId] = CommunityKitchen.ModEntry.i18n.Get("mail.saloondeliverysurchargewaived");
 
 				asset.ReplaceWith(data);
 				return;

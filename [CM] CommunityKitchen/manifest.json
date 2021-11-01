@@ -10,7 +10,8 @@
     "UpdateKeys": [ "Nexus:????" ],
     "Dependencies": [
         {
-            "UniqueID": "blueberry.CommunityKitchen"
+            "UniqueID": "blueberry.CommunityKitchen",
+            "IsRequired": true
         }
     ]
 }

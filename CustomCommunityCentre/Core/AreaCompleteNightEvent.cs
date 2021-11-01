@@ -30,6 +30,9 @@ namespace CustomCommunityCentre
 		public AreaCompleteNightEvent(int which)
 			: this()
 		{
+			Log.D($"Loading area completion cutscene for area {which}.",
+				CustomCommunityCentre.ModEntry.Config.DebugMode);
+
 			this.WhichEvent.Value = which;
 		}
 
@@ -153,7 +156,7 @@ namespace CustomCommunityCentre
 			}
 			Game1.randomizeRainPositions();
 
-			CustomCommunityCentre.Events.InvokeOnAreaCompleteCutsceneStarted(
+			CustomCommunityCentre.Events.Game.InvokeOnAreaCompleteCutsceneStarted(
 				areaName: bundleMetadata.AreaName,
 				areaNumber: this.WhichEvent.Value);
 
@@ -187,6 +190,9 @@ namespace CustomCommunityCentre
 
 		public void endEvent()
 		{
+			Log.D($"Ending area completion cutscene.",
+				CustomCommunityCentre.ModEntry.Config.DebugMode);
+
 			if (this.PreEventLocation != null)
 			{
 				Game1.currentLocation = this.PreEventLocation;
