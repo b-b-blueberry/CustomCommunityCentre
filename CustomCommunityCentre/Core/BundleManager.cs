@@ -597,20 +597,19 @@ namespace CustomCommunityCentre
 				// Save donated bundle items to world storage
 				{
 					Vector2 tileLocation = Utility.PointToVector2(Bundles.CustomBundleDonationsChestTile);
-					Chest chest = cc.Objects.TryGetValue(tileLocation, out StardewValley.Object o) && o is Chest
+					Chest existingChest = cc.Objects.TryGetValue(tileLocation, out StardewValley.Object o) && o is Chest
 						? o as Chest
-						: new(playerChest: true, tileLocation: tileLocation);
+						: null;
+					Chest chest = existingChest ?? new(playerChest: true, tileLocation: tileLocation);
 					chest.clearNulls();
 
 					if (Bundles.CustomBundleDonations.Any())
 					{
-						if (cc.Objects.ContainsKey(tileLocation))
+						if (o != null && existingChest == null)
 						{
 							// Replace any existing object with this chest
-							if (o != null)
-							{
-								chest.items.Add(cc.Objects[tileLocation]);
-							}
+							Log.I($"Bundle donations safekeeping chest now contains {o.Name}.");
+							chest.items.Add(cc.Objects[tileLocation]);
 						}
 						foreach (Item item in Bundles.CustomBundleDonations.ToList())
 						{
