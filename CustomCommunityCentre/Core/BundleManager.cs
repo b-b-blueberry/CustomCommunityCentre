@@ -635,7 +635,7 @@ namespace CustomCommunityCentre
 						.SelectMany(s => s)
 						.ToDictionary(
 							keySelector: bundleKey => bundleKey.Split(Bundles.BundleKeyDelim).First(),
-							elementSelector: bundleKey => cc.bundleRewards[int.Parse(bundleKey.Split(Bundles.BundleKeyDelim).Last())]);
+							elementSelector: bundleKey => cc.bundleRewards.TryGetValue(key: int.Parse(bundleKey.Split(Bundles.BundleKeyDelim).Last()), out bool isComplete) && isComplete);
 
 					string serialisedAreasCompleteData = string.Join(
 						Bundles.ModDataKeyDelim.ToString(),
@@ -650,9 +650,19 @@ namespace CustomCommunityCentre
 			}
 
 			// Reset world state to exclude custom content
-			BundleManager.Generate(isLoadingCustomContent: false);
-			BundleManager.ReplaceAreaBundleConversions(cc: cc);
-			cc.refreshBundlesIngredientsInfo();
+			try
+			{
+				BundleManager.Generate(isLoadingCustomContent: false);
+			}
+			catch (Exception e)
+            {
+				Log.E($"Error while unloading area-bundle data: {e}");
+            }
+			finally
+			{
+				BundleManager.ReplaceAreaBundleConversions(cc: cc);
+				cc.refreshBundlesIngredientsInfo();
+			}
 
 			Log.D("Unloaded bundle data.",
 				Config.DebugMode);
