@@ -145,7 +145,7 @@ namespace CustomCommunityCentre
 					rng: r);
 
 				// Add bundle data entries, ignoring existing values for mod compatibility
-				Dictionary<string, string> oldBundleData = Game1.netWorldState.Value.BundleData;
+				Dictionary<string, string> oldBundleData = Game1.netWorldState.Value.GetUnlocalizedBundleData();
 				bundleData = oldBundleData
 					.Union(bundleData.Where(pair => !oldBundleData.ContainsKey(pair.Key)))
 					.ToDictionary(pair => pair.Key, pair => pair.Value);
